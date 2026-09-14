@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Transaction Cinema
 
-## Getting Started
+**Turn any onchain transaction into a short animated story.**
 
-First, run the development server:
+Paste a mainnet transaction hash, press play, and watch an 11–15 second film:
+value flies between wallets, liquidity tunnels swallow and return it, failed
+transactions rewind while the gas is still paid. No wallet connection, no
+backend, no API keys — every number on screen is decoded by this app from raw
+JSON-RPC data.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Now showing (all real mainnet transactions)
+
+| Film | Kind | What happens |
+|---|---|---|
+| Through the liquidity tunnel | Uniswap V3 swap | 383.54 USDC enters a V3 pool; the price needle settles on the real terminal tick; 0.1534 WETH exits |
+| Ten trillion UNI, rejected | Failed tx | a huge approval is attempted; the world says no; everything rewinds — except the gas |
+| An infinite key to a USDC vault | Approval | `approve(spender, max uint256)` — the signed blank check, visualized as a vault key |
+| Fifteen hundred USDT | ERC20 transfer | tokens move, ETH does not; one Transfer event tells the whole story |
+| Two ETH, pocket to pocket | ETH transfer | the smallest complete story |
+
+## Architecture
+
+A pure-function pipeline. Every stage after the RPC calls is deterministic and
+tested against frozen fixtures of real transactions.
+
+```
+raw JSON-RPC  ──►  decode      ──►  classify        ──►  story builder    ──►  renderer
+(getTransaction,   (events +        (rule engine →         (kind → Scene[]    (React + Framer
+ receipt, block)    calldata         discriminated          IR + cast +        Motion, knows
+                    intent)          union TxKind)          captions)          only Scene types)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Key properties:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Event-driven classification.** An ERC20 Transfer event matches any emitter,
+  a V3 Swap event carries the full terminal state — so stories can be told
+  without traces, archive nodes, or router whitelists (the demo swap is routed
+  through the Universal Router; the detector never needed to know).
+- **The Story IR separates data from theatre.** `Scene[]` is the only thing the
+  renderer understands. Animation parameters (particle counts, liquid levels,
+  needle sweeps) are computed in the story layer from real amounts, so every
+  animation has a semantic reason to exist.
+- **Reverted txs have no logs** — events are discarded on revert. Their story
+  is built from calldata intent (`decodeFunctionData` + an honest `unknown`
+  fallback that shows the raw 4-byte selector instead of pretending).
+- **Honest attribution.** V3 pools are identical bytecode across forks, so
+  "Uniswap V3" is only claimed after asking the pool for its `factory()`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## What is real vs. what is theatre
 
-## Learn More
+A core discipline of this project: if an animation does not map to data, it is
+decoration, and it gets cut.
 
-To learn more about Next.js, take a look at the following resources:
+| Real (from RPC) | Theatre (deliberately stylized) |
+|---|---|
+| amounts, addresses, gas × price, block, timestamp | particle flight paths |
+| V3 terminal tick / sqrtPriceX96 / active liquidity | needle sweep path (destination is real, start is derived) |
+| execution price from actual amounts | corridor glow intensity (log of real liquidity) |
+| pool fee tier + factory attribution | tank/tunnel/void visual language |
+| "attempted" wording on failed txs | rewind choreography |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 ·
+Framer Motion · vitest (35 tests, fixture-driven, fully offline)
 
-## Deploy on Vercel
+## Run it
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm install
+npm run dev        # http://localhost:3000
+npm test           # 35 tests against frozen real-tx fixtures
+npm run build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Optionally set `NEXT_PUBLIC_RPC_URL` (e.g. a free Alchemy endpoint) to
+prioritize your own RPC quota; public endpoints are used otherwise.
+
+## Scripts
+
+```
+scripts/find-*.mjs          scan mainnet for demo transactions of each kind
+scripts/capture-fixture.mjs freeze a tx's raw RPC responses as a test fixture
+```
+
+## Why no Etherscan
+
+RPC-first architecture: no indexing APIs (Etherscan/Covalent/Moralis), no
+metadata APIs (token logos are deterministically generated from addresses),
+no USD prices (raw amounts only). The app talks to plain public JSON-RPC
+endpoints and decodes everything itself.
