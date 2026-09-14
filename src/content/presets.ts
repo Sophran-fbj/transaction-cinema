@@ -18,6 +18,13 @@ export const DEMO_PRESETS: Preset[] = [
     durationLabel: '13s',
   },
   {
+    hash: '0x4a5003ec93b14d06d27547f844f0008dae826b9076587d5de87b86be881706ee',
+    kindLabel: 'ETH swap',
+    title: 'ETH through the wrapping gate',
+    blurb: 'The router wraps ETH as WETH, 400 USDC comes out, change refunded.',
+    durationLabel: '13s',
+  },
+  {
     hash: '0xa5ac0a2aace0e5746f981adabc44913cf46aa3fedc2026caabd3a594a912a3d9',
     kindLabel: 'Failed tx',
     title: 'Ten trillion UNI, rejected',

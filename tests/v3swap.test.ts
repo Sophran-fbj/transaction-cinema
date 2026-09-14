@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { detectV3Swap } from '../src/lib/decode/v3'
 import { classifyTx } from '../src/lib/classify/kinds'
 import { buildStory } from '../src/lib/story/build'
-import { loadV3SwapFixture } from '../src/lib/fetch/fixture'
+import { loadEthBridgedSwapFixture, loadV3SwapFixture } from '../src/lib/fetch/fixture'
 
 // Fixture: a real single-pool Uniswap V3 swap routed through the Universal
 // Router — 383.54 USDC in, 0.1534 WETH out. Detection is event-shaped, so
@@ -68,5 +68,32 @@ describe('buildStory · v3 swap', () => {
     expect(scene.visualMassIn).toBeGreaterThan(0)
     expect(scene.visualMassOut).toBeLessThanOrEqual(64)
     expect(scene.tickSpan).toBeGreaterThan(0)
+  })
+})
+
+describe('buildStory · ETH-bridged V3 swap', () => {
+  // 0.158 ETH in via the router (wrapped, change refunded), 400 USDC out.
+  // The transfer graph is NOT direct: WETH arrives from the router — this
+  // fixture proves the caller-relayed WETH leg of the detector works.
+  const bundle = loadEthBridgedSwapFixture()
+
+  it('detects the swap through the router-relayed WETH leg', () => {
+    const swap = detectV3Swap(bundle.receipt, bundle.tx.to)
+    if (!swap) throw new Error('expected a V3 swap signal')
+    expect(swap.tokenIn.address.toLowerCase()).toBe('0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2')
+    expect(swap.tokenOut.amount).toBe(400_000_000n) // 400 USDC
+    expect(classifyTx(bundle).kind).toBe('v3Swap')
+  })
+
+  it('tells the story in ETH with the wrapping stated', () => {
+    const story = buildStory(bundle)
+    expect(story.title).toBe('ETH → USDC')
+    expect(story.synopsis).toContain('wrapped as WETH')
+    const scene = story.scenes[1]
+    if (scene.type !== 'swapV3') throw new Error('expected swapV3 scene')
+    expect(scene.caption.line).toContain('(your ETH, wrapped)')
+    // amounts stay in pool truth: WETH that actually entered
+    expect(scene.displayIn).toBe('0.157694273052205218')
+    expect(scene.displayOut).toBe('400')
   })
 })

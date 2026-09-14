@@ -72,7 +72,7 @@ export default function Home() {
       <div className="w-full max-w-xl">
         <div className="mb-3 flex items-baseline justify-between">
           <p className="text-[10px] tracking-[0.3em] text-zinc-600 uppercase">now showing</p>
-          <p className="text-[10px] text-zinc-700">five real mainnet films</p>
+          <p className="text-[10px] text-zinc-700">real mainnet films</p>
         </div>
         <div className="flex flex-col divide-y divide-white/5 rounded-xl border border-white/10 bg-white/[0.02]">
           {DEMO_PRESETS.map((preset, i) => (

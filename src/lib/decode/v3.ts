@@ -42,6 +42,10 @@ export interface V3SwapSignal {
   // resolved against the transfer graph: what the user paid and received
   tokenIn: { address: Address; amount: bigint }
   tokenOut: { address: Address; amount: bigint }
+  // true when the leg was relayed through the called contract (the router),
+  // i.e. ETH-bridge territory rather than a direct wallet↔pool hop
+  tokenInRelayed: boolean
+  tokenOutRelayed: boolean
 }
 
 // Detection is purely event-shaped: exactly one V3 Swap event, exactly two
@@ -111,5 +115,7 @@ export function detectV3Swap(
     tick,
     tokenIn: { address: inT.token, amount: inT.value },
     tokenOut: { address: outT.token, amount: outT.value },
+    tokenInRelayed: inT.from !== user,
+    tokenOutRelayed: outT.to !== user,
   }
 }

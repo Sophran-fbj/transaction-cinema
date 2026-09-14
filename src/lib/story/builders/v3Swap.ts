@@ -12,6 +12,8 @@ const DURATIONS = {
   outro: 2800,
 } as const
 
+const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+
 // The V3 film. The Swap event carries the full terminal state, so the story
 // is: value flies into the liquidity tunnel, the price needle settles on the
 // REAL terminal tick (sqrtPriceX96 straight from the event), and value flies
@@ -49,6 +51,14 @@ export function buildV3SwapStory(
   const poolInfo = bundle.poolInfo[swap.pool.toLowerCase()]
   const poolLabel = poolInfo?.label ?? 'V3 Pool'
   const feeLabel = poolInfo?.feeLabel ?? ''
+
+  // ETH bridging: the router wraps native ETH into WETH on the way in (relayed
+  // leg + the tx carries value) or unwraps on the way out (relayed WETH leg).
+  // A direct wallet↔pool WETH hop is just WETH — no bridge, no rename.
+  const isEthIn = swap.tokenIn.address === WETH && swap.tokenInRelayed && tx.value > 0n
+  const isEthOut = swap.tokenOut.address === WETH && swap.tokenOutRelayed
+  const inLabel = isEthIn ? 'ETH' : symIn
+  const outLabel = isEthOut ? 'ETH' : symOut
 
   const cast: Record<string, Actor> = {
     user: { id: 'user', kind: 'eoa', label: shortenAddress(user), address: user },
@@ -88,7 +98,7 @@ export function buildV3SwapStory(
       tickSpan: tickSpanFor(swap.tokenIn.amount, decimalsIn),
       assumedDecimals,
       caption: {
-        line: `${displayIn} ${symIn} enters the tunnel — ${displayOut} ${symOut} comes out.`,
+        line: `${displayIn} ${symIn}${isEthIn ? ' (your ETH, wrapped)' : ''} enters the tunnel — ${displayOut} ${symOut} comes out.`,
         sub: `${poolLabel}${feeLabel ? ` · ${feeLabel} fee tier` : ''} · price settles at tick ${swap.tick.toLocaleString('en-US')}`,
       },
     },
@@ -117,8 +127,8 @@ export function buildV3SwapStory(
     txHash: tx.hash,
     chainLabel: 'Ethereum',
     status: 'success',
-    title: `${symIn} → ${symOut}`,
-    synopsis: `Swapped ${displayIn} ${symIn} for ${displayOut} ${symOut} on ${poolLabel}`,
+    title: `${inLabel} → ${outLabel}`,
+    synopsis: `Swapped ${displayIn} ${inLabel} for ${displayOut} ${outLabel} on ${poolLabel}${isEthIn || isEthOut ? ' (wrapped as WETH)' : ''}`,
     cast,
     scenes,
     facts: {
