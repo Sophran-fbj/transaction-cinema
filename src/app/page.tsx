@@ -47,32 +47,42 @@ export default function Home() {
           e.preventDefault()
           play(value)
         }}
-        className="flex w-full max-w-xl gap-2"
+        className="w-full max-w-xl"
       >
-        <input
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value)
-            setError(null)
-          }}
-          placeholder="0x…"
-          spellCheck={false}
-          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-amber-300/40 focus:outline-none"
-        />
-        <button
-          type="submit"
-          className="rounded-lg bg-amber-300 px-5 py-3 text-sm font-medium text-zinc-950 transition-colors hover:bg-amber-200"
-        >
-          Play
-        </button>
+        <label htmlFor="tx-hash" className="sr-only">
+          Transaction hash
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="tx-hash"
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value)
+              setError(null)
+            }}
+            placeholder="0x…"
+            spellCheck={false}
+            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-zinc-200 placeholder:text-zinc-600 focus-visible:border-amber-300/50"
+          />
+          <button
+            type="submit"
+            className="rounded-lg bg-amber-300 px-5 py-3 text-sm font-medium text-zinc-950 transition-colors hover:bg-amber-200"
+          >
+            Play
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className="mt-2 text-center text-xs text-red-400 sm:text-left">
+            {error}
+          </p>
+        )}
       </form>
-      {error && <p className="-mt-8 text-xs text-red-400">{error}</p>}
 
       {/* now showing */}
       <div className="w-full max-w-xl">
         <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-[10px] tracking-[0.3em] text-zinc-600 uppercase">now showing</p>
-          <p className="text-[10px] text-zinc-700">real mainnet films</p>
+          <p className="text-[10px] tracking-[0.3em] text-zinc-500 uppercase">now showing</p>
+          <p className="text-[10px] text-zinc-500">real mainnet films</p>
         </div>
         <div className="flex flex-col divide-y divide-white/5 rounded-xl border border-white/10 bg-white/[0.02]">
           {DEMO_PRESETS.map((preset, i) => (
@@ -81,19 +91,19 @@ export default function Home() {
               href={`/play/eth/${preset.hash}`}
               className="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-white/5"
             >
-              <span className="font-mono text-xs text-zinc-600 group-hover:text-amber-200/80">
+              <span className="font-mono text-xs text-zinc-500 transition-colors group-hover:text-amber-200/80">
                 {String(i + 1).padStart(2, '0')}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-200">{preset.title}</span>
-                  <span className="rounded border border-white/10 px-1.5 py-px text-[9px] tracking-widest text-zinc-500 uppercase">
+                  <span className="rounded border border-white/10 px-1.5 py-px text-[9px] tracking-widest text-zinc-400 uppercase">
                     {preset.kindLabel}
                   </span>
                 </div>
                 <div className="mt-0.5 truncate text-xs text-zinc-500">{preset.blurb}</div>
               </div>
-              <span className="shrink-0 font-mono text-[10px] text-zinc-600">
+              <span className="shrink-0 font-mono text-[10px] text-zinc-500">
                 {preset.durationLabel}
               </span>
             </Link>
@@ -101,7 +111,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="text-center text-[11px] leading-relaxed text-zinc-600">
+      <footer className="text-center text-[11px] leading-relaxed text-zinc-500">
         RPC-first · no wallet needed · no indexing APIs
         <br />
         every number on screen decoded from raw transaction, receipt and logs

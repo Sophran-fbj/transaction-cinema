@@ -17,6 +17,10 @@ const SCENE_LABELS: Record<Story['scenes'][number]['type'], string> = {
 }
 
 // The theater: letterbox stage, subtitles, chapter timeline, controls.
+// The stage keeps a 26rem height floor until `lg`: the outro's receipt ticket
+// needs ~420px, which a 16:9 letterbox only provides above ~900px width.
+// Below `sm` the box is additionally 4:3 (taller than wide screens); from
+// `lg` up the pure widescreen ratio returns.
 export function Stage({ story }: { story: Story }) {
   const durations = useMemo(() => story.scenes.map((s) => s.durationMs), [story])
   const player = useScenePlayer(durations)
@@ -24,7 +28,7 @@ export function Stage({ story }: { story: Story }) {
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/60">
+      <div className="relative aspect-[4/3] min-h-[27rem] w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/60 sm:aspect-video lg:min-h-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={player.index}
@@ -62,43 +66,52 @@ export function Stage({ story }: { story: Story }) {
         )}
       </div>
 
-      {/* subtitles */}
-      <div className="mt-4 flex min-h-14 items-center justify-between gap-4">
-        <span className="w-32 shrink-0 text-[10px] tracking-[0.25em] text-zinc-600 uppercase">
+      {/* subtitles — caption first on phones; from `sm` up the caption stays
+          optically centered between the scene counter and a balancing spacer */}
+      <div className="mt-4 grid min-h-14 items-center gap-1.5 text-center sm:grid-cols-[1fr_auto_1fr] sm:gap-4">
+        <span className="order-2 text-[10px] tracking-[0.25em] text-zinc-500 uppercase sm:order-none sm:text-left">
           Scene {player.index + 1}/{story.scenes.length} · {SCENE_LABELS[scene.type]}
         </span>
-        <p className="flex-1 text-center text-sm text-zinc-300">
+        <p aria-live="polite" className="order-1 text-sm leading-snug text-zinc-300 sm:order-none">
           {scene.caption.line}
           {scene.caption.sub && (
             <span className="mt-0.5 block text-xs text-zinc-500">{scene.caption.sub}</span>
           )}
         </p>
-        <span className="w-32 shrink-0" />
+        <span aria-hidden className="hidden sm:block" />
       </div>
 
-      {/* chapter timeline: click a segment to jump to that scene */}
-      <div className="mt-2 flex gap-1">
-        {story.scenes.map((s, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => player.jumpTo(i)}
-            aria-label={`Jump to scene ${i + 1}`}
-            className="group h-1.5 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/10"
-          >
-            <div
-              className="h-full rounded-full bg-amber-300/80 transition-colors group-hover:bg-amber-200"
-              style={{
-                width:
-                  i < player.index
-                    ? '100%'
-                    : i === player.index
-                      ? `${Math.min(1, player.progress) * 100}%`
-                      : '0%',
-              }}
-            />
-          </button>
-        ))}
+      {/* chapter timeline: jump to a scene. The button is a 24px-tall hit
+          target (WCAG 2.2) around a 6px bar; per-frame fill runs through a
+          MotionValue so this section never re-renders for progress alone. */}
+      <div className="mt-2 flex gap-1.5" role="group" aria-label="Chapter timeline">
+        {story.scenes.map((s, i) => {
+          const isPast = i < player.index
+          const isActive = i === player.index
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => player.jumpTo(i)}
+              aria-label={`Scene ${i + 1} of ${story.scenes.length}: ${SCENE_LABELS[s.type]}`}
+              aria-current={isActive ? 'true' : undefined}
+              className="group flex h-6 flex-1 cursor-pointer items-center"
+            >
+              <span
+                className={`h-1.5 w-full overflow-hidden rounded-full transition-colors ${
+                  isPast ? 'bg-amber-300/80' : 'bg-white/10 group-hover:bg-white/20'
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    className="block h-full w-full origin-left rounded-full bg-amber-300/80 transition-colors group-hover:bg-amber-200"
+                    style={{ scaleX: player.progress }}
+                  />
+                )}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* controls */}

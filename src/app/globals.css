@@ -16,3 +16,10 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Visible keyboard focus everywhere (WCAG 2.2). The amber matches the ticket
+   aesthetic; hover-only affordances get a keyboard-visible equivalent. */
+:focus-visible {
+  outline: 2px solid rgb(252 211 77 / 0.7);
+  outline-offset: 2px;
+}

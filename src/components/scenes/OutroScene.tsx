@@ -8,9 +8,9 @@ import { formatBlockTimestamp, shortenAddress } from '@/lib/utils/format'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 py-2">
+    <div className="flex items-baseline justify-between gap-6 py-1.5 sm:py-2">
       <span className="shrink-0 text-[10px] tracking-[0.2em] text-zinc-500 uppercase">{label}</span>
-      <span className="text-right font-mono text-sm text-zinc-200">{children}</span>
+      <span className="text-right font-mono text-[13px] text-zinc-200 sm:text-sm">{children}</span>
     </div>
   )
 }
@@ -47,7 +47,10 @@ export function OutroScene({
   const gwei = Number(formatGwei(facts.effectiveGasPrice)).toLocaleString('en-US')
 
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6 py-6">
+    // Small screens run the ticket vertically: the perforation and stub are
+    // hidden (the stub carries no unique data) and rows compress, so all
+    // seven receipt rows fit the mobile stage instead of being clipped.
+    <div className="flex h-full flex-col items-center justify-center px-4 py-4 sm:px-6 sm:py-5">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -55,8 +58,8 @@ export function OutroScene({
         className="flex w-full max-w-md items-stretch"
       >
         {/* ticket body */}
-        <div className="flex-1 rounded-l-xl border border-r-0 border-white/10 bg-zinc-900/70 p-5 sm:p-6">
-          <div className="mb-3 flex items-center justify-between">
+        <div className="flex-1 rounded-xl border border-white/10 bg-zinc-900/70 p-4 sm:rounded-l-xl sm:rounded-r-none sm:border-r-0 sm:p-6">
+          <div className="mb-2 flex items-center justify-between sm:mb-3">
             <span className="text-[10px] tracking-[0.3em] text-zinc-500 uppercase">
               transaction cinema
             </span>
@@ -82,37 +85,39 @@ export function OutroScene({
             <Row label="Block">{facts.blockNumber.toLocaleString('en-US')}</Row>
             <Row label="Time">{formatBlockTimestamp(facts.timestamp)}</Row>
             <Row label="Hash">
-              <span className="text-left text-[11px] break-all">{txHash}</span>
+              {/* full hash on wide tickets, shortened where it must fit one line */}
+              <span className="sm:hidden">{shortenAddress(txHash)}</span>
+              <span className="hidden text-left text-[11px] break-all sm:inline">{txHash}</span>
             </Row>
           </div>
         </div>
 
         {/* perforation: dashed line with punched semicircles top and bottom */}
-        <div className="relative w-0 border-l border-dashed border-white/20">
+        <div className="relative hidden w-0 border-l border-dashed border-white/20 sm:block">
           <div className="absolute top-0 -left-[9px] size-[18px] rounded-full bg-black" />
           <div className="absolute bottom-0 -left-[9px] size-[18px] rounded-full bg-black" />
         </div>
 
-        {/* ticket stub */}
-        <div className="flex w-24 flex-col items-center justify-center gap-8 rounded-r-xl border border-l-0 border-white/10 bg-zinc-900 py-4 sm:w-28">
-          <span className="text-[9px] tracking-[0.3em] text-amber-200/70 uppercase [writing-mode:vertical-rl]">
+        {/* ticket stub — decorative on wide screens only */}
+        <div className="hidden w-24 flex-col items-center justify-center gap-8 rounded-r-xl border border-l-0 border-white/10 bg-zinc-900 py-4 sm:flex sm:w-28">
+          <span className="text-[9px] tracking-[0.3em] text-amber-200/80 uppercase [writing-mode:vertical-rl]">
             admit one
           </span>
           <div className="flex flex-col items-center gap-1">
-            <span className="text-[8px] tracking-[0.25em] text-zinc-600 uppercase">ticket no.</span>
+            <span className="text-[9px] tracking-[0.25em] text-zinc-500 uppercase">ticket no.</span>
             <span className="font-mono text-xs text-zinc-400">{txHash.slice(-6)}</span>
-            <span className="font-mono text-[10px] text-zinc-600">
+            <span className="font-mono text-[10px] text-zinc-500">
               blk {facts.blockNumber.toString().slice(-6)}
             </span>
           </div>
         </div>
       </motion.div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:mt-5">
         <button type="button" onClick={onReplay} className={BUTTON}>
           Replay
         </button>
-        <button type="button" onClick={copyLink} className={BUTTON}>
+        <button type="button" onClick={copyLink} className={BUTTON} aria-live="polite">
           {copied ? 'Copied' : 'Copy link'}
         </button>
         <a

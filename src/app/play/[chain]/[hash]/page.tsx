@@ -14,7 +14,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 // Server shell: reads route params, hands them to the client player.
 // The browser does all fetching — this page renders instantly.
+// The key remounts the player when the params change, so a same-route
+// navigation can never inherit the previous film's state.
 export default async function PlayPage({ params }: Props) {
   const { chain, hash } = await params
-  return <PlayerScreen chainSlug={chain} hash={hash} />
+  return <PlayerScreen key={`${chain}:${hash}`} chainSlug={chain} hash={hash} />
 }

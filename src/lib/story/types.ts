@@ -80,7 +80,8 @@ export type Scene =
       priceLabel?: string
       poolLabel: string // "Uniswap V3" via factory()
       feeLabel: string // "0.05%"
-      // stylized: how far the needle sweeps (visual only, start is derived)
+      // how far the needle sweeps, derived from the real amountIn via
+      // tickSpanFor — the renderer maps it onto the ruler's coordinate space
       tickSpan: number
       assumedDecimals?: boolean
     })

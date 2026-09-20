@@ -1,24 +1,33 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { isHash } from 'viem'
 import { Stage } from '@/components/stage/Stage'
+import { createRpcClient } from '@/lib/chain/client'
 import { getChainConfig } from '@/lib/chain/chains'
-import { enrichPoolInfo, enrichTokenMeta } from '@/lib/decode/enrich'
+import { enrichBundle } from '@/lib/decode/enrich'
 import { TxNotMinedError, TxNotFoundError, getTxBundle } from '@/lib/fetch/getTxBundle'
 import { buildStory } from '@/lib/story/build'
 import type { Story } from '@/lib/story/types'
 
 type State =
   | { status: 'loading' }
-  | { status: 'ready'; story: Story }
-  | { status: 'error'; message: string }
+  | { status: 'ready'; story: Story; warnings: string[] }
+  | { status: 'error'; message: string; retryable: boolean }
 
-// Client-side only: the browser talks to public RPC endpoints directly.
-// No wallet, no backend, no API keys required.
+// Client-side only: the browser talks to RPC endpoints directly (same-origin
+// proxy first when deployed with one). No wallet, no indexing APIs.
 export function PlayerScreen({ chainSlug, hash }: { chainSlug: string; hash: string }) {
   const [state, setState] = useState<State>({ status: 'loading' })
+  // Retry re-runs the fetch. The loading switch happens here (an event
+  // handler, not an effect): entering a new tx remounts this component via
+  // the page's key, so state resets happen at the event/mount boundaries.
+  const [attempt, setAttempt] = useState(0)
+  const retry = useCallback(() => {
+    setAttempt((a) => a + 1)
+    setState({ status: 'loading' })
+  }, [])
 
   // input validation is synchronous — derive it during render, not in an effect
   const validationError = !getChainConfig(chainSlug)
@@ -30,30 +39,41 @@ export function PlayerScreen({ chainSlug, hash }: { chainSlug: string; hash: str
   useEffect(() => {
     // isHash narrows `hash` to `0x${string}` for the fetch below
     if (validationError || !isHash(hash)) return
+    const controller = new AbortController()
     let cancelled = false
-    getTxBundle(hash)
-      // token metadata multicall, then pool attribution (each a no-op when
-      // the tx has no Transfer events / V3 Swap event)
-      .then((bundle) => enrichTokenMeta(bundle))
-      .then((bundle) => enrichPoolInfo(bundle))
-      .then((bundle) => {
-        if (!cancelled) setState({ status: 'ready', story: buildStory(bundle) })
+    const client = createRpcClient(controller.signal)
+    getTxBundle(hash, client)
+      // enrichment is best-effort (see enrichBundle): token metadata or pool
+      // attribution failing does NOT fail the film — it degrades honestly
+      .then((bundle) => enrichBundle(bundle, client))
+      .then(({ bundle, degraded }) => {
+        if (cancelled) return
+        const warnings = [
+          degraded.tokenMeta && 'Token metadata unavailable — amounts are shown raw.',
+          degraded.poolInfo && 'Pool attribution unavailable — shown as a generic V3 pool.',
+        ].filter((w): w is string => Boolean(w))
+        setState({ status: 'ready', story: buildStory(bundle), warnings })
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        if (error instanceof TxNotFoundError || error instanceof TxNotMinedError) {
-          setState({ status: 'error', message: error.message })
+        if (error instanceof TxNotFoundError) {
+          setState({ status: 'error', message: error.message, retryable: false })
+        } else if (error instanceof TxNotMinedError) {
+          setState({ status: 'error', message: error.message, retryable: true })
         } else {
           setState({
             status: 'error',
             message: 'RPC fetch failed — public endpoints rate-limit. Try again in a moment.',
+            retryable: true,
           })
         }
       })
     return () => {
       cancelled = true
+      // actually cancel in-flight network work, don't just ignore the result
+      controller.abort()
     }
-  }, [chainSlug, hash, validationError])
+  }, [chainSlug, hash, validationError, attempt])
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-8 sm:px-8">
@@ -71,11 +91,19 @@ export function PlayerScreen({ chainSlug, hash }: { chainSlug: string; hash: str
       ) : state.status === 'loading' ? (
         <LoadingFilm />
       ) : state.status === 'error' ? (
-        <ErrorNotice message={state.message} />
+        <ErrorNotice message={state.message} retryable={state.retryable} onRetry={retry} />
       ) : null}
 
       {state.status === 'ready' && (
         <>
+          {state.warnings.length > 0 && (
+            <div
+              role="status"
+              className="mx-auto mb-4 max-w-xl rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2.5 text-center text-xs text-amber-200/90"
+            >
+              {state.warnings.join(' ')}
+            </div>
+          )}
           <div className="mb-5 text-center">
             <h1 className="text-lg font-medium text-zinc-100">{state.story.title}</h1>
             <p className="mt-1 text-sm text-zinc-500">{state.story.synopsis}</p>
@@ -89,7 +117,7 @@ export function PlayerScreen({ chainSlug, hash }: { chainSlug: string; hash: str
 
 function LoadingFilm() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4">
+    <div role="status" className="flex flex-1 flex-col items-center justify-center gap-4">
       <div className="flex gap-1.5">
         {[0, 1, 2, 3, 4].map((i) => (
           <div
@@ -104,16 +132,35 @@ function LoadingFilm() {
   )
 }
 
-function ErrorNotice({ message }: { message: string }) {
+function ErrorNotice({
+  message,
+  retryable = false,
+  onRetry,
+}: {
+  message: string
+  retryable?: boolean
+  onRetry?: () => void
+}) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-      <p className="max-w-md text-sm text-zinc-400">{message}</p>
-      <Link
-        href="/"
-        className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs text-zinc-300 transition-colors hover:bg-white/10"
-      >
-        Back to the lobby
-      </Link>
+    <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+      <p className="max-w-md break-words px-4 text-sm text-zinc-400">{message}</p>
+      <div className="flex gap-2">
+        {retryable && onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-lg bg-amber-300 px-4 py-2 text-xs font-medium text-zinc-950 transition-colors hover:bg-amber-200"
+          >
+            Retry
+          </button>
+        )}
+        <Link
+          href="/"
+          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs text-zinc-300 transition-colors hover:bg-white/10"
+        >
+          Back to the lobby
+        </Link>
+      </div>
     </div>
   )
 }

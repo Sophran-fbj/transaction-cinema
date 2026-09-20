@@ -15,9 +15,10 @@ const DURATIONS = {
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 
 // The V3 film. The Swap event carries the full terminal state, so the story
-// is: value flies into the liquidity tunnel, the price needle settles on the
-// REAL terminal tick (sqrtPriceX96 straight from the event), and value flies
-// back out. The needle's path is stylized — only its destination is claimed.
+// is: value flies into the liquidity tunnel, the price needle sweeps a
+// trade-size-derived distance (tickSpan) and settles on the REAL terminal
+// tick (sqrtPriceX96 straight from the event), and value flies back out.
+// Only the needle's start is derived — its destination is claimed as data.
 export function buildV3SwapStory(
   bundle: TxBundle,
   { swap }: { swap: V3SwapSignal },

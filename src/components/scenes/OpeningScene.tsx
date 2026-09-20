@@ -35,7 +35,7 @@ export function OpeningScene({ facts, txHash }: { facts: StoryFacts; txHash: `0x
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8, delay: 0.8 }}
-        className="text-xs text-zinc-600"
+        className="text-xs text-zinc-500"
       >
         {formatBlockTimestamp(facts.timestamp)}
       </motion.div>
