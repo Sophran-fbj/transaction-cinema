@@ -1,5 +1,7 @@
 # Transaction Cinema
 
+English | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/Sophran-fbj/transaction-cinema/actions/workflows/ci.yml/badge.svg)](https://github.com/Sophran-fbj/transaction-cinema/actions/workflows/ci.yml)
 
 **Turn any onchain transaction into a short animated story.**
@@ -10,11 +12,15 @@ transactions rewind while the gas is still paid. No wallet connection, no
 indexing APIs — every number on screen is decoded by this app from raw
 JSON-RPC data.
 
-<!-- TODO before sharing: deploy (Vercel one-click), then add:
-- Live demo link here
-- A hero screenshot: ![screenshot](docs/screenshot.png)
-- A 10–20s GIF of the V3 swap film playing
--->
+## At a glance
+
+| | |
+|---|---|
+| **Problem** | A transaction is raw hex: receipts, logs and calldata. Reading one means hand-decoding events and call inputs. |
+| **What I built** | A player that turns one mainnet transaction into an 11–15 second animated film, decoded entirely from raw JSON-RPC — no indexing APIs, no wallet. |
+| **Tech stack** | Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 · Framer Motion · vitest |
+| **Try it** | `npm run dev`, then paste any Ethereum mainnet tx hash — no wallet connection, no API key |
+| **Tests** | 52 vitest tests over frozen real-transaction fixtures, fully offline |
 
 ## Now showing (all real mainnet transactions)
 
@@ -199,3 +205,20 @@ and online — there is no second data source to drift.
   are set in `next.config.ts`.
 - Deploys as a standard Next.js app (e.g. Vercel); the RPC proxy route needs
   a Node/serverless runtime, not a static export.
+
+## More from me
+
+Two sibling projects that answer the other halves of the same question — all
+three are RPC-first, built on viem, and prefer an honest fallback over an
+invented answer:
+
+- **[0x-lens](https://github.com/Sophran-fbj/0x-lens)** — *who is this address?*
+  A Chrome extension that reveals onchain identity on hover: ENS, balance,
+  EOA / contract, and EIP-7702 delegation, without touching the host page.
+- **[TxRay · sophran-tools](https://github.com/Sophran-fbj/sophran-tools)** — *is
+  this approval safe?* Approval, calldata and EIP-712 signature risk checking
+  across Ethereum, Base, Arbitrum and Optimism.
+
+## License
+
+[MIT](./LICENSE)
