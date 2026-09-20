@@ -1,7 +1,6 @@
 # Transaction Cinema
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-<!-- Replace OWNER/REPO above (and in any deploy badge) once the repo is pushed to GitHub. -->
+[![CI](https://github.com/Sophran-fbj/transaction-cinema/actions/workflows/ci.yml/badge.svg)](https://github.com/Sophran-fbj/transaction-cinema/actions/workflows/ci.yml)
 
 **Turn any onchain transaction into a short animated story.**
 
