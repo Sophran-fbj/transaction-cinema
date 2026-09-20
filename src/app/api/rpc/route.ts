@@ -7,11 +7,14 @@
 // pipeline needs are allowed through, and only immutable responses (mined
 // txs, receipts, historical blocks) are cached.
 
+// Same health-checked set as the browser list (see src/lib/chain/client.ts):
+// RPC_URL first when configured, then drpc and 1rpc (full receipts), with
+// publicnode last — its receipt lookups return null for older transactions.
 const UPSTREAM_URLS = [
   process.env.RPC_URL,
+  'https://eth.drpc.org',
+  'https://1rpc.io/eth',
   'https://ethereum-rpc.publicnode.com',
-  'https://eth.llamarpc.com',
-  'https://rpc.ankr.com/eth',
 ].filter((url): url is string => Boolean(url))
 
 const ALLOWED_METHODS = new Set([
@@ -96,6 +99,7 @@ async function forward(request: RpcRequestBody): Promise<unknown> {
     method: request.method,
     params,
   })
+  let upstreamError: ReturnType<typeof rpcError> | undefined
   for (const url of UPSTREAM_URLS) {
     try {
       const response = await fetch(url, {
@@ -106,13 +110,20 @@ async function forward(request: RpcRequestBody): Promise<unknown> {
       })
       if (!response.ok) continue
       const json = (await response.json()) as Record<string, unknown>
+      // A 200 carrying a JSON-RPC error body is a provider refusal (e.g. a
+      // keywall or method block), not an answer — remember it and ask the
+      // next upstream instead of passing the refusal through.
+      if (json.error) {
+        upstreamError = json as ReturnType<typeof rpcError>
+        continue
+      }
       if (isCacheable(request.method, params, json.result)) cacheSet(cacheKey, json)
       return json
     } catch {
       // endpoint down / timed out — try the next one
     }
   }
-  return rpcError(request.id, -32000, 'All upstream RPC endpoints failed')
+  return upstreamError ?? rpcError(request.id, -32000, 'All upstream RPC endpoints failed')
 }
 
 // A batch fans out to N concurrent upstream calls, so bound it — viem only

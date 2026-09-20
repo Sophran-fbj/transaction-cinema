@@ -13,10 +13,14 @@ import { mainnet } from 'viem/chains'
 
 // Used everywhere the browser talks to RPC directly; when the same-origin
 // proxy is available it is tried first.
+// Health-checked 2026-09: drpc and 1rpc serve full history (tx + receipt +
+// block). publicnode answers tx/block but returns result:null receipts for
+// older transactions — demoted to last resort. llamarpc (dead, 525) and
+// ankr (keywalled) were removed.
 const PUBLIC_RPC_URLS = [
+  'https://eth.drpc.org',
+  'https://1rpc.io/eth',
   'https://ethereum-rpc.publicnode.com',
-  'https://eth.llamarpc.com',
-  'https://rpc.ankr.com/eth',
 ]
 
 function rpcUrls(): string[] {

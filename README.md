@@ -117,14 +117,14 @@ decoration, and it gets cut.
 ## Tech
 
 Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 ·
-Framer Motion · vitest (47 tests, fixture-driven, fully offline)
+Framer Motion · vitest (52 tests, fixture-driven, fully offline)
 
 ## Run it
 
 ```bash
 npm ci             # Node >= 20.9 (see .nvmrc)
 npm run dev        # http://localhost:3000
-npm test           # 47 tests against frozen real-tx fixtures
+npm test           # 52 tests against frozen real-tx fixtures
 npm run build      # fully offline — fonts are self-hosted
 ```
 

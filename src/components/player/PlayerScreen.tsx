@@ -7,7 +7,12 @@ import { Stage } from '@/components/stage/Stage'
 import { createRpcClient } from '@/lib/chain/client'
 import { getChainConfig } from '@/lib/chain/chains'
 import { enrichBundle } from '@/lib/decode/enrich'
-import { TxNotMinedError, TxNotFoundError, getTxBundle } from '@/lib/fetch/getTxBundle'
+import {
+  ReceiptUnavailableError,
+  TxNotMinedError,
+  TxNotFoundError,
+  getTxBundle,
+} from '@/lib/fetch/getTxBundle'
 import { buildStory } from '@/lib/story/build'
 import type { Story } from '@/lib/story/types'
 
@@ -59,6 +64,8 @@ export function PlayerScreen({ chainSlug, hash }: { chainSlug: string; hash: str
         if (error instanceof TxNotFoundError) {
           setState({ status: 'error', message: error.message, retryable: false })
         } else if (error instanceof TxNotMinedError) {
+          setState({ status: 'error', message: error.message, retryable: true })
+        } else if (error instanceof ReceiptUnavailableError) {
           setState({ status: 'error', message: error.message, retryable: true })
         } else {
           setState({

@@ -21,6 +21,15 @@ export class TxNotMinedError extends Error {
   }
 }
 
+export class ReceiptUnavailableError extends Error {
+  constructor(hash: string) {
+    super(
+      `The endpoint did not return the receipt for ${hash}, although the transaction is mined — try again.`,
+    )
+    this.name = 'ReceiptUnavailableError'
+  }
+}
+
 // Live path: three raw JSON-RPC calls, then the shared formatter.
 // Deliberately not client.getTransaction(): keeping the wire format explicit
 // means fixtures captured by scripts/capture-fixture.mjs feed the exact same
@@ -31,21 +40,34 @@ export async function getTxBundle(
   hash: `0x${string}`,
   client: RpcClient = publicClient,
 ): Promise<TxBundle> {
-  const [transaction, receipt] = await Promise.all([
+  const [transaction, firstReceipt] = await Promise.all([
     client.request({ method: 'eth_getTransactionByHash', params: [hash] }),
     client.request({ method: 'eth_getTransactionReceipt', params: [hash] }),
   ])
   if (!transaction) throw new TxNotFoundError(hash)
-  if (!receipt) throw new TxNotMinedError(hash)
+  const rawTx = transaction as RawTransaction
+
+  // The transaction itself is the authority on mined-ness: blockNumber is
+  // set the moment it lands in a block. A null receipt for a mined tx is an
+  // endpoint malfunction (seen in the wild: providers returning result:null
+  // for older receipts), never the chain's truth — so "not mined" is only
+  // reported when the TRANSACTION says so, and a missing receipt for a mined
+  // tx gets one retry before surfacing as a retryable error. viem's fallback
+  // cannot do this: a null result is a valid answer to it, so the first
+  // transport's null would be accepted as final.
+  if (!firstReceipt && rawTx.blockNumber === null) throw new TxNotMinedError(hash)
+  const receipt = firstReceipt
+    ? (firstReceipt as RawReceipt)
+    : ((await client.request({
+        method: 'eth_getTransactionReceipt',
+        params: [hash],
+      })) as RawReceipt | null)
+  if (!receipt) throw new ReceiptUnavailableError(hash)
 
   const block = await client.request({
     method: 'eth_getBlockByNumber',
-    params: [receipt.blockNumber, false],
+    params: [receipt.blockNumber as `0x${string}`, false],
   })
 
-  return rpcToBundle(
-    transaction as RawTransaction,
-    receipt as RawReceipt,
-    block as RawBlockHeader,
-  )
+  return rpcToBundle(rawTx, receipt, block as RawBlockHeader)
 }

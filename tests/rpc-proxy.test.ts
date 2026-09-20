@@ -109,6 +109,24 @@ describe('rpc proxy · guardrails', () => {
     expect(upstream).not.toHaveBeenCalled()
   })
 
+  it('advances to the next upstream when one answers 200 with an error body', async () => {
+    // a provider refusal with HTTP 200 (e.g. a keywall) must not be passed
+    // through as the answer — the next healthy upstream wins
+    upstream.mockImplementation(async (url: unknown) => {
+      if (String(url).includes('1rpc')) return upstreamResponse('0x1')
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          error: { code: -32000, message: 'Unauthorized' },
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      )
+    })
+    const { json } = await post(rpcBody('eth_chainId'))
+    expect((json as JsonRpcResponse).result).toBe('0x1')
+  })
+
   it('serves a batch with results aligned to request order', async () => {
     // echo the request id the way a real upstream does
     upstream.mockImplementation(async (_url: unknown, init?: { body?: string }) => {
