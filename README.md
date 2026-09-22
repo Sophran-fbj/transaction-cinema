@@ -18,7 +18,7 @@ JSON-RPC data.
 |---|---|
 | **Problem** | A transaction is raw hex: receipts, logs and calldata. Reading one means hand-decoding events and call inputs. |
 | **What I built** | A player that turns one mainnet transaction into an 11–15 second animated film, decoded entirely from raw JSON-RPC — no indexing APIs, no wallet. |
-| **Tech stack** | Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 · Framer Motion · vitest · Playwright |
+| **Tech stack** | Next.js 16 (App Router) · React 19 · TypeScript · TanStack Query · viem · Tailwind CSS v4 · Framer Motion · vitest · Playwright |
 | **Try it** | `npm run dev`, then paste any Ethereum mainnet tx hash — no wallet connection, no API key |
 | **Tests** | 59 vitest tests + 3 Playwright smoke tests, fixture-driven and fully offline |
 
@@ -59,6 +59,11 @@ story.
 
 A pure-function pipeline. Every stage after the RPC calls is deterministic and
 tested against frozen fixtures of real transactions.
+
+The browser keeps completed films in TanStack Query under `[film, chain, hash]`.
+Confirmed-transaction films stay fresh for the session and are collected after
+30 minutes without use, so returning from the lobby to the same transaction is
+instant and does not repeat the RPC pipeline.
 
 ```
 raw JSON-RPC  ──►  decode      ──►  classify        ──►  story builder    ──►  renderer
@@ -101,6 +106,7 @@ src/lib/decode/        log/calldata decoding, token & pool enrichment
 src/lib/classify/      rule engine → discriminated-union TxKind
 src/lib/story/         Story IR types + one builder per TxKind
 src/lib/story/semantics.ts   amount → animation-parameter mapping
+src/lib/player/        scene clock + TanStack Query film cache
 src/components/scenes/ one dumb renderer component per Scene type
 src/components/stage/  player chrome (Stage, timeline, subtitles)
 src/app/api/rpc/       same-origin RPC proxy (optional, server-only key)
@@ -124,7 +130,7 @@ decoration, and it gets cut.
 
 ## Tech
 
-Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 ·
+Next.js 16 (App Router) · React 19 · TypeScript · TanStack Query · viem · Tailwind CSS v4 ·
 Framer Motion · vitest (59 tests) · Playwright (3 smoke tests), all
 fixture-driven and fully offline
 
@@ -203,7 +209,7 @@ and online — there is no second data source to drift.
 
 ## Deployment & CI
 
-- GitHub Actions (`.github/workflows/ci.yml`): `npm ci → lint → test → build`
+- GitHub Actions (`.github/workflows/ci.yml`): `npm ci → lint → unit tests → build → Playwright`
   on every push/PR, pinned to the Node version in `.nvmrc`.
 - Security headers (nosniff, strict referrer, frame-deny, permissions lock)
   are set in `next.config.ts`.
