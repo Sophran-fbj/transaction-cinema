@@ -6,6 +6,7 @@ import { GasScene } from './GasScene'
 import { OpeningScene } from './OpeningScene'
 import { OutroScene } from './OutroScene'
 import { RevertScene } from './RevertScene'
+import { SwapV2Scene } from './SwapV2Scene'
 import { SwapV3Scene } from './SwapV3Scene'
 import { TransferScene } from './TransferScene'
 
@@ -35,6 +36,8 @@ export function SceneRenderer({
       return <ApprovalScene scene={scene} cast={cast} />
     case 'revert':
       return <RevertScene scene={scene} cast={cast} />
+    case 'swapV2':
+      return <SwapV2Scene scene={scene} cast={cast} />
     case 'swapV3':
       return <SwapV3Scene scene={scene} cast={cast} />
     case 'gas':

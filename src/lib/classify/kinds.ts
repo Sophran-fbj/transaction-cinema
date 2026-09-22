@@ -5,6 +5,7 @@ import {
   type Erc20TransferEvent,
 } from '../decode/events'
 import { decodeIntent, type DecodedIntent } from '../decode/intent'
+import { detectV2Swap, type V2SwapSignal } from '../decode/v2'
 import { detectV3Swap, type V3SwapSignal } from '../decode/v3'
 import type { TxBundle } from '../fetch/types'
 import { calldataSelector } from '../utils/selector'
@@ -16,6 +17,7 @@ export type TxKind =
   | { kind: 'nativeTransfer' }
   | { kind: 'erc20Transfer'; transfer: Erc20TransferEvent }
   | { kind: 'erc20Approval'; approval: Erc20ApprovalEvent }
+  | { kind: 'v2Swap'; swap: V2SwapSignal }
   | { kind: 'v3Swap'; swap: V3SwapSignal }
   | { kind: 'reverted'; selector: `0x${string}` | null; intent: DecodedIntent }
   | { kind: 'unknown'; selector: `0x${string}` | null }
@@ -45,5 +47,7 @@ export function classifyTx({ tx, receipt }: TxBundle): TxKind {
   }
   const v3Swap = detectV3Swap(receipt, tx.to)
   if (v3Swap) return { kind: 'v3Swap', swap: v3Swap }
+  const v2Swap = detectV2Swap(receipt, tx.to)
+  if (v2Swap) return { kind: 'v2Swap', swap: v2Swap }
   return { kind: 'unknown', selector }
 }

@@ -18,14 +18,15 @@ JSON-RPC data.
 |---|---|
 | **Problem** | A transaction is raw hex: receipts, logs and calldata. Reading one means hand-decoding events and call inputs. |
 | **What I built** | A player that turns one mainnet transaction into an 11–15 second animated film, decoded entirely from raw JSON-RPC — no indexing APIs, no wallet. |
-| **Tech stack** | Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 · Framer Motion · vitest |
+| **Tech stack** | Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 · Framer Motion · vitest · Playwright |
 | **Try it** | `npm run dev`, then paste any Ethereum mainnet tx hash — no wallet connection, no API key |
-| **Tests** | 52 vitest tests over frozen real-transaction fixtures, fully offline |
+| **Tests** | 59 vitest tests + 3 Playwright smoke tests, fixture-driven and fully offline |
 
 ## Now showing (all real mainnet transactions)
 
 | Film | Kind | What happens |
 |---|---|---|
+| The constant-product balance | Uniswap V2 swap | 197.01 UNI tips the pair's reserve tanks; 0.6436 WETH flows out while x × y stays invariant |
 | Through the liquidity tunnel | Uniswap V3 swap | 383.54 USDC enters a V3 pool; the price needle settles on the real terminal tick; 0.1534 WETH exits |
 | ETH through the wrapping gate | ETH-bridged V3 swap | the router wraps ETH as WETH, 400 USDC comes out, change refunded — detected through the relayed WETH leg |
 | Ten trillion UNI, rejected | Failed tx | a huge approval is attempted; the world says no; everything rewinds — except the gas |
@@ -40,10 +41,11 @@ JSON-RPC data.
 | ETH value transfer | full film | ✅ supported |
 | ERC20 transfer | full film | ✅ supported |
 | ERC20 approval (limited / unlimited / revoke) | full film | ✅ supported |
+| Uniswap V2 swap (single pair, any router) | constant-product reserve film | ✅ supported |
 | Uniswap V3 swap (single pool, any router) | full film | ✅ supported |
 | ETH-bridged V3 swap (router wraps/unwraps WETH) | full film | ✅ supported |
 | Reverted tx with decodable calldata | attempt → no → rewind | ✅ supported |
-| Uniswap V2 swaps, multi-hop V3, aggregators | — | 🚧 planned |
+| Multi-hop V2/V3, aggregators | — | 🚧 planned |
 | ERC721 / ERC1155 transfers | — | 🚧 planned |
 | Contract creation, arbitrary contract calls | generic receipt framing | 🚧 planned |
 | Other chains (Base, Arbitrum, Optimism) | — | 🚧 planned |
@@ -67,10 +69,10 @@ raw JSON-RPC  ──►  decode      ──►  classify        ──►  story
 
 Key properties:
 
-- **Event-driven classification.** An ERC20 Transfer event matches any emitter,
-  a V3 Swap event carries the full terminal state — so stories can be told
-  without traces, archive nodes, or router whitelists (the demo swap is routed
-  through the Universal Router; the detector never needed to know).
+- **Event-driven classification.** ERC20 Transfer events match any emitter;
+  V2 Swap + Sync events expose flows and terminal reserves, while a V3 Swap
+  carries the full terminal state. Stories need no traces, archive nodes, or
+  router whitelists.
 - **The Story IR separates data from theatre.** `Scene[]` is the only thing the
   renderer understands. Animation parameters (particle counts, liquid levels,
   needle sweeps) are computed in the story layer from real amounts, so every
@@ -103,6 +105,7 @@ src/components/scenes/ one dumb renderer component per Scene type
 src/components/stage/  player chrome (Stage, timeline, subtitles)
 src/app/api/rpc/       same-origin RPC proxy (optional, server-only key)
 tests/                 vitest suites over frozen real-tx fixtures
+e2e/                   Playwright smoke tests with intercepted fixture RPC
 scripts/               fixture capture + demo-tx finders
 ```
 
@@ -122,14 +125,16 @@ decoration, and it gets cut.
 ## Tech
 
 Next.js 16 (App Router) · React 19 · TypeScript · viem · Tailwind CSS v4 ·
-Framer Motion · vitest (52 tests, fixture-driven, fully offline)
+Framer Motion · vitest (59 tests) · Playwright (3 smoke tests), all
+fixture-driven and fully offline
 
 ## Run it
 
 ```bash
 npm ci             # Node >= 20.9 (see .nvmrc)
 npm run dev        # http://localhost:3000
-npm test           # 52 tests against frozen real-tx fixtures
+npm test           # 59 tests against frozen real-tx fixtures
+npm run test:e2e   # 3 Chromium smoke tests; starts Next automatically
 npm run build      # fully offline — fonts are self-hosted
 ```
 
@@ -168,9 +173,8 @@ and online — there is no second data source to drift.
 
 - **Single chain.** Ethereum mainnet only; the route validates `/play/eth/…`
   and everything else is rejected up front.
-- **Rich multi-log txs get simplified.** A swap that touches several pools is
-  told through its largest leg, not every hop; aggregators are not yet
-  attributed.
+- **Single-pair/pool swaps.** V2/V3 films require one swap event and two token
+  legs. Multi-hop routes and aggregators fall back to the honest unknown film.
 - **Public RPC rate limits.** Without `RPC_URL`, a burst of plays can hit
   public-endpoint quotas; the UI offers retry, and enrichment failures
   degrade instead of failing.

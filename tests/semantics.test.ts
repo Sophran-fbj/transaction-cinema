@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { visualMassForEth, visualMassForToken } from '../src/lib/story/semantics'
+import {
+  reserveLevelFor,
+  visualMassForEth,
+  visualMassForToken,
+} from '../src/lib/story/semantics'
 
 // The data→animation boundary, pinned: these numbers decide how heavy a value
 // feels. If they change, the film changes — deliberately, and only here.
@@ -29,5 +33,13 @@ describe('visualMassForToken', () => {
 
   it('survives absurd supplies without NaN', () => {
     expect(visualMassForToken(10n ** 40n, 18)).toBe(64)
+  })
+})
+
+describe('reserveLevelFor', () => {
+  it('maps V2 reserves into a bounded logarithmic tank level', () => {
+    expect(reserveLevelFor(0n, 18)).toBe(0.25)
+    expect(reserveLevelFor(1_000n * 10n ** 18n, 18)).toBeGreaterThan(0.25)
+    expect(reserveLevelFor(10n ** 60n, 18)).toBe(0.92)
   })
 })

@@ -4,6 +4,7 @@ import { enrichBundle } from '../src/lib/decode/enrich'
 import {
   loadErc20TransferFixture,
   loadNativeTransferFixture,
+  loadV2SwapFixture,
   loadV3SwapFixture,
 } from '../src/lib/fetch/fixture'
 
@@ -41,8 +42,9 @@ describe('enrichBundle · partial failure', () => {
     expect(enriched.tx).toBe(bundle.tx)
   })
 
-  it('flags pool attribution loss only for real V3 swaps', async () => {
+  it('flags pool attribution loss only for real V2/V3 swaps', async () => {
     const swapBundle = { ...loadV3SwapFixture(), poolInfo: {} }
+    const v2Bundle = { ...loadV2SwapFixture(), poolInfo: {} }
     const nativeBundle = loadNativeTransferFixture()
 
     const swap = await enrichBundle(swapBundle, okClient, {
@@ -52,7 +54,14 @@ describe('enrichBundle · partial failure', () => {
     })
     expect(swap.degraded.poolInfo).toBe(true)
 
-    // no V3 swap in a plain transfer → nothing user-visible was lost
+    const v2 = await enrichBundle(v2Bundle, okClient, {
+      poolInfo: async () => {
+        throw new Error('transport down')
+      },
+    })
+    expect(v2.degraded.poolInfo).toBe(true)
+
+    // no pool swap in a plain transfer → nothing user-visible was lost
     const native = await enrichBundle(nativeBundle, okClient, {
       poolInfo: async () => {
         throw new Error('transport down')

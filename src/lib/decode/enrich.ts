@@ -4,6 +4,7 @@ import { publicClient, type RpcClient } from '../chain/client'
 import type { PoolInfo, TokenMeta, TxBundle } from '../fetch/types'
 import { decodeIntent } from './intent'
 import { parseErc20Approvals, parseErc20Transfers } from './events'
+import { UNISWAP_V2_FACTORY, detectV2Swap } from './v2'
 import { UNISWAP_V3_FACTORY, detectV3Swap } from './v3'
 
 // Enrichment bridge: decode-aware, fetch-executing. Finds token addresses in
@@ -82,9 +83,11 @@ export async function enrichPoolInfo(
   bundle: TxBundle,
   client: RpcClient = publicClient,
 ): Promise<TxBundle> {
-  const swap = detectV3Swap(bundle.receipt, bundle.tx.to)
-  if (!swap) return bundle
-  const pool = swap.pool
+  const v3Swap = detectV3Swap(bundle.receipt, bundle.tx.to)
+  const v2Swap = v3Swap ? null : detectV2Swap(bundle.receipt, bundle.tx.to)
+  if (!v3Swap && !v2Swap) return bundle
+  const version = v3Swap ? 'v3' : 'v2'
+  const pool = v3Swap?.pool ?? v2Swap!.pair
   if (bundle.poolInfo[pool.toLowerCase()]) return bundle
 
   const [factoryRes, feeRes] = await Promise.all([
@@ -93,23 +96,25 @@ export async function enrichPoolInfo(
       abi: v3PoolReaderAbi,
       functionName: 'factory',
     }),
-    readContract(client, {
-      address: pool,
-      abi: v3PoolReaderAbi,
-      functionName: 'fee',
-    }),
+    v3Swap
+      ? readContract(client, {
+          address: pool,
+          abi: v3PoolReaderAbi,
+          functionName: 'fee',
+        })
+      : Promise.resolve(undefined),
   ])
-
-  const label =
-    getAddress(factoryRes).toLowerCase() === UNISWAP_V3_FACTORY.toLowerCase()
-      ? 'Uniswap V3'
-      : 'V3 AMM'
+  const factory = getAddress(factoryRes)
+  const isUniswap =
+    factory.toLowerCase() ===
+    (version === 'v3' ? UNISWAP_V3_FACTORY : UNISWAP_V2_FACTORY).toLowerCase()
+  const label = isUniswap ? `Uniswap ${version.toUpperCase()}` : `${version.toUpperCase()} AMM`
   const poolInfo: Record<string, PoolInfo> = {
     ...bundle.poolInfo,
     [pool.toLowerCase()]: {
       address: pool,
       label,
-      feeLabel: feeTierLabel(Number(feeRes)),
+      feeLabel: feeRes === undefined ? (isUniswap ? '0.3%' : '') : feeTierLabel(Number(feeRes)),
     },
   }
   return { ...bundle, poolInfo }
@@ -150,7 +155,10 @@ export async function enrichBundle(
   }
   if (poolRes.status === 'fulfilled') {
     enriched = { ...enriched, poolInfo: poolRes.value.poolInfo }
-  } else if (detectV3Swap(bundle.receipt, bundle.tx.to)) {
+  } else if (
+    detectV3Swap(bundle.receipt, bundle.tx.to) ||
+    detectV2Swap(bundle.receipt, bundle.tx.to)
+  ) {
     degraded.poolInfo = true
   }
   return { bundle: enriched, degraded }

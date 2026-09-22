@@ -62,6 +62,28 @@ export type Scene =
       costEth: bigint
     })
   | (SceneCommon & {
+      type: 'swapV2'
+      pair: ActorId
+      tokenIn: ActorId
+      tokenOut: ActorId
+      amountIn: bigint
+      amountOut: bigint
+      displayIn: string
+      displayOut: string
+      visualMassIn: number
+      visualMassOut: number
+      reserveIn: bigint
+      reserveOut: bigint
+      displayReserveIn: string
+      displayReserveOut: string
+      reserveLevelIn: number
+      reserveLevelOut: number
+      priceLabel?: string
+      poolLabel: string
+      feeLabel: string
+      assumedDecimals?: boolean
+    })
+  | (SceneCommon & {
       type: 'swapV3'
       pool: ActorId
       tokenIn: ActorId

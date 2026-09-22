@@ -32,3 +32,12 @@ export function tickSpanFor(amountIn: bigint, decimalsIn: number): number {
   if (!Number.isFinite(units)) return 12
   return Math.min(60, Math.max(4, Math.round(3 * Math.log10(1 + units) + 2)))
 }
+
+// Reserve tank level for V2 pairs. Token units vary wildly, so logarithmic
+// normalization conveys depth without pretending unlike assets are directly
+// comparable. The exact reserves remain printed beside the tanks.
+export function reserveLevelFor(reserve: bigint, decimals: number): number {
+  const units = Number(reserve) / 10 ** decimals
+  if (!Number.isFinite(units) || units <= 0) return 0.25
+  return Math.min(0.92, Math.max(0.25, 0.25 + Math.log10(1 + units) * 0.08))
+}

@@ -10,6 +10,7 @@ const SCENE_LABELS: Record<Story['scenes'][number]['type'], string> = {
   opening: 'Opening',
   transfer: 'Transfer',
   approval: 'Approval',
+  swapV2: 'Swap',
   swapV3: 'Swap',
   revert: 'Revert',
   gas: 'Gas',

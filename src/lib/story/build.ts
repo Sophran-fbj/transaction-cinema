@@ -4,6 +4,7 @@ import { buildErc20ApprovalStory } from './builders/erc20Approval'
 import { buildErc20TransferStory } from './builders/erc20Transfer'
 import { buildNativeTransferStory } from './builders/nativeTransfer'
 import { buildRevertedStory } from './builders/reverted'
+import { buildV2SwapStory } from './builders/v2Swap'
 import { buildV3SwapStory } from './builders/v3Swap'
 import { buildUnknownStory } from './builders/unknown'
 import type { Story } from './types'
@@ -20,6 +21,7 @@ const BUILDERS: BuilderMap = {
   nativeTransfer: buildNativeTransferStory,
   erc20Transfer: buildErc20TransferStory,
   erc20Approval: buildErc20ApprovalStory,
+  v2Swap: buildV2SwapStory,
   v3Swap: buildV3SwapStory,
   reverted: buildRevertedStory,
 }

@@ -16,14 +16,15 @@
 |---|---|
 | **问题** | 一笔交易就是一堆原始十六进制：receipt、log 和 calldata。想读懂它，就得手动解码事件和调用参数。 |
 | **做了什么** | 一个播放器，把一笔主网交易变成 11–15 秒的动画短片，全部由原始 JSON-RPC 解码而来——不用索引 API，不用钱包。 |
-| **技术栈** | Next.js 16（App Router）· React 19 · TypeScript · viem · Tailwind CSS v4 · Framer Motion · vitest |
+| **技术栈** | Next.js 16（App Router）· React 19 · TypeScript · viem · Tailwind CSS v4 · Framer Motion · vitest · Playwright |
 | **怎么试** | `npm run dev`，然后粘贴任意以太坊主网交易哈希——无需连接钱包，无需 API key |
-| **测试** | 52 个 vitest 测试，跑在冻结的真实交易 fixture 上，完全离线 |
+| **测试** | 59 个 vitest 测试 + 3 个 Playwright 冒烟测试，fixture 驱动且完全离线 |
 
 ## 正在放映（全部为真实主网交易）
 
 | 影片 | 类型 | 剧情 |
 |---|---|---|
+| 恒定乘积的平衡 | Uniswap V2 swap | 197.01 UNI 压动交易对的储备罐；0.6436 WETH 流出，x × y 保持不变 |
 | 穿过流动性隧道 | Uniswap V3 swap | 383.54 USDC 进入 V3 池；价格指针停在真实的终点 tick；0.1534 WETH 流出 |
 | ETH 穿过包装之门 | ETH 桥接的 V3 swap | 路由把 ETH 包装成 WETH，400 USDC 流出，找零退回——通过中继的 WETH 腿识别出来 |
 | 十万亿 UNI，被拒绝 | 失败交易 | 一次巨额授权被尝试；世界说不；一切倒带——除了 gas |
@@ -38,10 +39,11 @@
 | ETH 原生转账 | 完整影片 | ✅ 已支持 |
 | ERC20 转账 | 完整影片 | ✅ 已支持 |
 | ERC20 授权（限额 / 无限 / 撤销） | 完整影片 | ✅ 已支持 |
+| Uniswap V2 swap（单交易对，任意路由） | 恒定乘积储备影片 | ✅ 已支持 |
 | Uniswap V3 swap（单池，任意路由） | 完整影片 | ✅ 已支持 |
 | ETH 桥接的 V3 swap（路由包装/解包 WETH） | 完整影片 | ✅ 已支持 |
 | 带可解码 calldata 的回滚交易 | 尝试 → 被拒 → 倒带 | ✅ 已支持 |
-| Uniswap V2 swap、多跳 V3、聚合器 | — | 🚧 计划中 |
+| 多跳 V2/V3、聚合器 | — | 🚧 计划中 |
 | ERC721 / ERC1155 转账 | — | 🚧 计划中 |
 | 合约创建、任意合约调用 | 通用的 receipt 取景 | 🚧 计划中 |
 | 其他链（Base、Arbitrum、Optimism） | — | 🚧 计划中 |
@@ -64,9 +66,9 @@ raw JSON-RPC  ──►  decode      ──►  classify        ──►  story
 
 关键性质：
 
-- **事件驱动的分类。** 一个 ERC20 Transfer 事件可以匹配任意 emitter，一个 V3 Swap
-  事件自带完整的终态——所以故事不需要 trace、归档节点或路由白名单就能讲出来
-  （演示用 swap 经由 Universal Router 路由；检测器从不需要知道这件事）。
+- **事件驱动的分类。** ERC20 Transfer 事件可以匹配任意 emitter；V2 的 Swap + Sync
+  事件给出流向与终态储备，V3 Swap 则自带完整终态。因此故事不需要 trace、归档节点
+  或路由白名单。
 - **Story IR 把数据和戏剧性分开。** `Scene[]` 是渲染层唯一理解的东西。动画参数
   （粒子数量、液面高度、指针扫动）都在 story 层由真实数值算出，所以每一个动画都有
   存在的语义理由——V3 指针的扫动长度来自真实成交规模（`tickSpanFor`），它的终点
@@ -94,6 +96,7 @@ src/components/scenes/ 每种 Scene 一个「哑」渲染组件
 src/components/stage/  播放器外壳（Stage、时间线、字幕）
 src/app/api/rpc/       同源 RPC 代理（可选，服务端专属 key）
 tests/                 跑在冻结真实交易 fixture 上的 vitest 套件
+e2e/                   拦截 RPC 并使用 fixture 的 Playwright 冒烟测试
 scripts/               fixture 抓取 + 演示交易查找器
 ```
 
@@ -112,14 +115,16 @@ scripts/               fixture 抓取 + 演示交易查找器
 ## 技术
 
 Next.js 16（App Router）· React 19 · TypeScript · viem · Tailwind CSS v4 ·
-Framer Motion · vitest（52 个测试，fixture 驱动，完全离线）
+Framer Motion · vitest（59 个测试）· Playwright（3 个冒烟测试），全部由
+fixture 驱动且完全离线
 
 ## 运行
 
 ```bash
 npm ci             # Node >= 20.9（见 .nvmrc）
 npm run dev        # http://localhost:3000
-npm test           # 52 个测试，跑在冻结的真实交易 fixture 上
+npm test           # 59 个测试，跑在冻结的真实交易 fixture 上
+npm run test:e2e   # 3 个 Chromium 冒烟测试；自动启动 Next
 npm run build      # 完全离线——字体是自托管的
 ```
 
@@ -154,8 +159,8 @@ JSON-RPC 端点对话，其余全部自己解码。这让依赖面收敛到一�
 ## 已知限制
 
 - **单链。** 仅以太坊主网；路由会校验 `/play/eth/…`，其他一切在一开始就被拒绝。
-- **多 log 的复杂交易会被简化。** 一笔触及多个池的 swap，只讲它最大的那条腿，而不是
-  每一跳；聚合器尚未做归属。
+- **仅限单交易对/单池 swap。** V2/V3 影片要求一个 swap 事件和两条 token 腿；多跳
+  路由与聚合器会回退到诚实的「未知」影片。
 - **公共 RPC 限流。** 未设置 `RPC_URL` 时，连续播放可能触到公共端点配额；UI 提供
   重试，增强失败会降级而不是整体失败。
 - **元数据假设。** ERC20 的 `name/symbol/decimals` 就是合约返回什么就是什么；一个

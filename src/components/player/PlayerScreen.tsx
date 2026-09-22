@@ -55,7 +55,7 @@ export function PlayerScreen({ chainSlug, hash }: { chainSlug: string; hash: str
         if (cancelled) return
         const warnings = [
           degraded.tokenMeta && 'Token metadata unavailable — amounts are shown raw.',
-          degraded.poolInfo && 'Pool attribution unavailable — shown as a generic V3 pool.',
+          degraded.poolInfo && 'Pool attribution unavailable — shown as a generic AMM pool.',
         ].filter((w): w is string => Boolean(w))
         setState({ status: 'ready', story: buildStory(bundle), warnings })
       })

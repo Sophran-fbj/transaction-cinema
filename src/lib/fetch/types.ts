@@ -9,8 +9,8 @@ export interface TokenMeta {
 
 export interface PoolInfo {
   address: Address
-  label: string // "Uniswap V3" — honest attribution via factory()
-  feeLabel: string // "0.05%" / "0.3%" / "1%"
+  label: string // "Uniswap V2/V3" — honest attribution via factory()
+  feeLabel: string // V2: "0.3%"; V3: "0.05%" / "0.3%" / "1%"
 }
 
 // Everything a story can be built from: the raw RPC triple plus decoded

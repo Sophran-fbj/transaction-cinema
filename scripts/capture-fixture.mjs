@@ -9,9 +9,9 @@ import { fileURLToPath } from 'node:url'
 
 const RPCS = [
   process.env.RPC_URL,
+  'https://eth.drpc.org',
+  'https://1rpc.io/eth',
   'https://ethereum-rpc.publicnode.com',
-  'https://eth.llamarpc.com',
-  'https://rpc.ankr.com/eth',
 ].filter(Boolean)
 
 async function rpc(method, params) {

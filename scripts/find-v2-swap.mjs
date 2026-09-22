@@ -1,18 +1,20 @@
-// Brute-force scan: pull receipts for every tx in recent blocks and keep the
-// ones whose logs contain a V2-pair Swap event, then apply the app's own
-// detection shape (one Swap+Sync from one pair, exactly two ERC20 Transfers
-// X→pair and pair→Y, X/Y ∈ {tx sender, tx.to}, caller-relayed legs WETH-only).
-// Works for any V2 fork (Uniswap, SushiSwap, …) — no getLogs needed.
+// Scan V2-pair Swap logs in recent blocks, then apply the app's own detection
+// shape to those candidate receipts (one Swap+Sync from one pair, exactly two
+// ERC20 Transfers X→pair and pair→Y, X/Y ∈ {tx sender, tx.to}, caller-relayed
+// legs WETH-only). This avoids pulling every receipt in every block.
+// Works for any V2 fork (Uniswap, SushiSwap, …); factory() is printed so the
+// result can be attributed honestly before it becomes a fixture.
 // Usage: node scripts/find-v2-swap.mjs [blocks=4]
 import { keccak256, toEventSignature } from 'viem'
 
-const RPCS = ['https://ethereum-rpc.publicnode.com', 'https://rpc.ankr.com/eth']
+const RPCS = ['https://eth.drpc.org', 'https://1rpc.io/eth', 'https://ethereum-rpc.publicnode.com']
 
 const WETH = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
 const SWAP_TOPIC = keccak256(
   toEventSignature('Swap(address,uint256,uint256,uint256,uint256,address)'),
 )
 const TRANSFER_TOPIC = keccak256(toEventSignature('Transfer(address,address,uint256)'))
+const FACTORY_SELECTOR = '0xc45a0155'
 
 async function rpc(method, params) {
   for (const url of RPCS) {
@@ -33,14 +35,17 @@ async function rpc(method, params) {
 
 const span = Number(process.argv[2] ?? '4')
 const latest = Number((await rpc('eth_getBlockByNumber', ['latest', false])).number)
+const fromBlock = '0x' + Math.max(0, latest - span).toString(16)
+const toBlock = '0x' + Math.max(0, latest - 1).toString(16)
+const swapLogs = await rpc('eth_getLogs', [{ fromBlock, toBlock, topics: [SWAP_TOPIC] }])
+const hashes = [...new Set(swapLogs.map((log) => log.transactionHash))]
 
 let found = 0
-outer: for (let n = latest - 1; n > latest - span && found < 8; n--) {
-  const block = await rpc('eth_getBlockByNumber', ['0x' + n.toString(16), true])
-  if (!block) continue
-
-  for (const tx of block.transactions || []) {
-    const receipt = await rpc('eth_getTransactionReceipt', [tx.hash])
+for (const hash of hashes) {
+  const [tx, receipt] = await Promise.all([
+    rpc('eth_getTransactionByHash', [hash]),
+    rpc('eth_getTransactionReceipt', [hash]),
+  ])
     if (!receipt || receipt.status !== '0x1') continue
 
     const swaps = receipt.logs.filter((l) => l.topics[0] === SWAP_TOPIC)
@@ -48,7 +53,9 @@ outer: for (let n = latest - 1; n > latest - span && found < 8; n--) {
     const pair = swaps[0].address.toLowerCase()
 
     const transfers = receipt.logs.filter(
-      (l) => l.topics[0] === TRANSFER_TOPIC && l.topics.length === 4,
+      // ERC20 Transfer indexes from/to; value is the 32-byte data word.
+      // Four topics would be the ERC721 Transfer shape instead.
+      (l) => l.topics[0] === TRANSFER_TOPIC && l.topics.length === 3,
     )
     if (transfers.length !== 2) continue
 
@@ -68,12 +75,18 @@ outer: for (let n = latest - 1; n > latest - span && found < 8; n--) {
     if (relayed && inT.address.toLowerCase() !== WETH && outT.address.toLowerCase() !== WETH) continue
 
     const ethIn = BigInt(tx.value) > 0n
-    const ethOut = addr(outT.topics[2]) !== user
+    const ethOut = outT.address.toLowerCase() === WETH && addr(outT.topics[2]) !== user
+    let factory = 'unknown'
+    try {
+      const rawFactory = await rpc('eth_call', [{ to: pair, data: FACTORY_SELECTOR }, receipt.blockNumber])
+      factory = '0x' + rawFactory.slice(-40)
+    } catch {
+      // Some forks do not expose factory(); keep the candidate generic.
+    }
     console.log(
-      `${tx.hash}  pair ${pair}  ${ethIn ? 'ETH' : 'tok'}→${ethOut ? 'ETH' : 'tok'}  in=${BigInt(inT.data)} (${inT.address})  out=${BigInt(outT.data)} (${outT.address})  block ${n}`,
+      `${tx.hash}  pair ${pair}  factory ${factory}  ${ethIn ? 'ETH' : 'tok'}→${ethOut ? 'ETH' : 'tok'}  in=${BigInt(inT.data)} (${inT.address})  out=${BigInt(outT.data)} (${outT.address})  block ${Number(receipt.blockNumber)}`,
     )
     found++
-    if (found >= 8) break outer
-  }
+    if (found >= 8) break
 }
 if (found === 0) console.log('none found — widen the span')

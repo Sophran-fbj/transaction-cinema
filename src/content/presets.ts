@@ -11,6 +11,13 @@ export interface Preset {
 
 export const DEMO_PRESETS: Preset[] = [
   {
+    hash: '0xf573e1e394f1100359b6c3efbaa1bbbeed2a50cd29ed077c2cbf9c077d19c072',
+    kindLabel: 'V2 swap',
+    title: 'The constant-product balance',
+    blurb: '197.01 UNI tips the reserve tanks — 0.6436 WETH flows out.',
+    durationLabel: '13s',
+  },
+  {
     hash: '0xfc27562d1a9aa37c3a1a145d75f71908b3f1ee9bb1d54d5a0d3a8c2913bae0a6',
     kindLabel: 'V3 swap',
     title: 'Through the liquidity tunnel',
