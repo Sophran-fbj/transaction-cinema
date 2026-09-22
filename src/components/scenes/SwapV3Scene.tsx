@@ -6,7 +6,7 @@ import type { Actor, Scene } from '@/lib/story/types'
 import { ActorCard } from '@/components/actors/ActorCard'
 import { actorHues } from '@/components/actors/actorVisual'
 import { CountUp } from '@/components/primitives/CountUp'
-import { useSceneElapsed } from '@/lib/player/ScenePlaybackContext'
+import { sampleKeyframes, useSceneProgress, type SceneEase } from '@/lib/player/sceneTimeline'
 import { usePrefersReducedMotion } from '@/lib/player/usePrefersReducedMotion'
 import { liquidityGlow } from '@/lib/story/semantics'
 
@@ -25,31 +25,6 @@ function particleGlow(actor: Actor | undefined) {
   }
 }
 
-type TimelineEase = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'
-
-function ease(progress: number, easing: TimelineEase) {
-  if (easing === 'easeIn') return progress * progress
-  if (easing === 'easeOut') return 1 - (1 - progress) ** 2
-  if (easing === 'easeInOut') return progress * progress * (3 - 2 * progress)
-  return progress
-}
-
-function useTimelineProgress(delayMs: number, durationMs: number, easing: TimelineEase = 'linear') {
-  const elapsed = useSceneElapsed()
-  return useTransform(elapsed, (elapsedMs) => {
-    const linear = Math.min(1, Math.max(0, (elapsedMs - delayMs) / Math.max(1, durationMs)))
-    return ease(linear, easing)
-  })
-}
-
-function sample(values: number[], progress: number) {
-  if (values.length === 1) return values[0]
-  const scaled = progress * (values.length - 1)
-  const index = Math.min(values.length - 2, Math.floor(scaled))
-  const local = scaled - index
-  return values[index] + (values[index + 1] - values[index]) * local
-}
-
 function ClockedParticle({
   style,
   positions,
@@ -61,11 +36,11 @@ function ClockedParticle({
   positions: [number, number, number]
   delayMs: number
   durationMs: number
-  easing: TimelineEase
+  easing: SceneEase
 }) {
-  const progress = useTimelineProgress(delayMs, durationMs, easing)
-  const left = useTransform(progress, (value) => `${sample(positions, value)}%`)
-  const opacity = useTransform(progress, (value) => sample([0, 1, 0.9], value))
+  const progress = useSceneProgress({ delayMs, durationMs, easing })
+  const left = useTransform(progress, (value) => `${sampleKeyframes(positions, value)}%`)
+  const opacity = useTransform(progress, (value) => sampleKeyframes([0, 1, 0.9], value))
 
   return (
     <motion.div
@@ -76,7 +51,7 @@ function ClockedParticle({
 }
 
 function ClockedCorridor({ style, beat }: { style: CSSProperties; beat: number }) {
-  const progress = useTimelineProgress(300 * beat, 1200 * beat, 'easeInOut')
+  const progress = useSceneProgress({ delayMs: 300 * beat, durationMs: 1200 * beat, easing: 'easeInOut' })
   const scaleY = useTransform(progress, (value) => 0.6 + value * 0.4)
 
   return (
@@ -98,9 +73,9 @@ function ClockedNeedle({
   beat: number
   children: ReactNode
 }) {
-  const progress = useTimelineProgress(1100 * beat, 2200 * beat, 'easeInOut')
+  const progress = useSceneProgress({ delayMs: 1100 * beat, durationMs: 2200 * beat, easing: 'easeInOut' })
   const left = useTransform(progress, (value) => `${start + (destination - start) * value}%`)
-  const opacity = useTransform(progress, (value) => sample([0, 1, 1], value))
+  const opacity = useTransform(progress, (value) => sampleKeyframes([0, 1, 1], value))
 
   return (
     <motion.div
@@ -113,7 +88,7 @@ function ClockedNeedle({
 }
 
 function ClockedPrice({ beat, children }: { beat: number; children: ReactNode }) {
-  const opacity = useTimelineProgress(3400 * beat, 600 * beat, 'easeInOut')
+  const opacity = useSceneProgress({ delayMs: 3400 * beat, durationMs: 600 * beat, easing: 'easeInOut' })
   return (
     <motion.div style={{ opacity }} className="mt-1.5 text-xs text-amber-200/80">
       {children}

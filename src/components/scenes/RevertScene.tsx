@@ -1,8 +1,64 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useTransform } from 'framer-motion'
+import type { ReactNode } from 'react'
 import type { Actor, Scene } from '@/lib/story/types'
 import { CountUp } from '@/components/primitives/CountUp'
+import { sampleKeyframes, useSceneProgress } from '@/lib/player/sceneTimeline'
+
+function RevertFrame({ children }: { children: ReactNode }) {
+  const progress = useSceneProgress({ durationMs: 1400, easing: 'easeIn' })
+  const filter = useTransform(progress, (value) => `saturate(${1 - value * 0.65})`)
+  return (
+    <motion.div className="relative h-full w-full" style={{ filter }}>
+      {children}
+    </motion.div>
+  )
+}
+
+function ShakingLayer({ children }: { children: ReactNode }) {
+  const progress = useSceneProgress({ delayMs: 200, durationMs: 500 })
+  const x = useTransform(progress, (value) =>
+    sampleKeyframes([0, 0, -9, 9, -5, 3, 0], value, [0, 0.55, 0.65, 0.75, 0.85, 0.95, 1]),
+  )
+  return (
+    <motion.div className="absolute inset-0" style={{ x }}>
+      {children}
+    </motion.div>
+  )
+}
+
+function RewindParticle({ wave, delayMs }: { wave: number; delayMs: number }) {
+  const progress = useSceneProgress({ delayMs, durationMs: 1600, easing: 'easeIn' })
+  const up = wave - 16
+  const left = useTransform(progress, (value) => `${sampleKeyframes([54, 45, 16], value)}%`)
+  const top = useTransform(progress, (value) =>
+    `calc(50% + ${sampleKeyframes([up, up, wave], value)}px)`,
+  )
+  const opacity = useTransform(progress, (value) => sampleKeyframes([0, 1, 0], value))
+  return (
+    <motion.div
+      className="absolute size-2.5 rounded-full bg-zinc-400 shadow-[0_0_10px_2px_rgb(161_161_170_/_0.35)]"
+      style={{ left, top, opacity }}
+    />
+  )
+}
+
+function RevertStamp() {
+  const progress = useSceneProgress({ delayMs: 700, durationMs: 350, easing: 'easeOut' })
+  const scale = useTransform(progress, (value) => 2.4 - value * 1.4)
+  const rotate = useTransform(progress, (value) => -14 + value * 8)
+  return (
+    <motion.div
+      style={{ opacity: progress, scale, rotate, boxShadow: '0 0 48px 12px rgb(239 68 68 / 0.25)' }}
+      className="rounded-md border-4 border-red-500/80 px-5 py-2"
+    >
+      <span className="font-mono text-xl font-bold tracking-[0.2em] text-red-400 uppercase sm:text-2xl">
+        Execution reverted
+      </span>
+    </motion.div>
+  )
+}
 
 // The signature moment: time runs backwards. Particles retrace their path in
 // grey (color drains as the world rejects the tx), the amount ticks back to
@@ -24,42 +80,18 @@ export function RevertScene({
   const particles = Array.from({ length: scene.visualMass ?? 0 })
 
   return (
-    <motion.div
-      className="relative h-full w-full"
-      initial={{ filter: 'saturate(1)' }}
-      animate={{ filter: 'saturate(0.35)' }}
-      transition={{ duration: 1.4, ease: 'easeIn' }}
-    >
+    <RevertFrame>
       {/* stage shake on impact */}
-      <motion.div
-        className="absolute inset-0"
-        animate={{ x: [0, 0, -9, 9, -5, 3, 0] }}
-        transition={{ duration: 0.5, times: [0, 0.55, 0.65, 0.75, 0.85, 0.95, 1], delay: 0.2 }}
-      >
+      <ShakingLayer>
         {/* rewind: particles retrace leftwards, desaturated */}
         {hasParticles &&
           particles.map((_, i) => {
             const wave = ((i % 5) - 2) * 14
-            const up = wave - 16
             return (
-              <motion.div
+              <RewindParticle
                 key={i}
-                className="absolute size-2.5 rounded-full bg-zinc-400 shadow-[0_0_10px_2px_rgb(161_161_170_/_0.35)]"
-                initial={{ left: '54%', top: `calc(50% + ${up}px)`, opacity: 0 }}
-                animate={{
-                  left: ['54%', '45%', '16%'],
-                  top: [
-                    `calc(50% + ${up}px)`,
-                    `calc(50% + ${up}px)`,
-                    `calc(50% + ${wave}px)`,
-                  ],
-                  opacity: [0, 1, 0],
-                }}
-                transition={{
-                  duration: 1.6,
-                  delay: 0.15 + (i / (scene.visualMass ?? 1)) * 0.8,
-                  ease: 'easeIn',
-                }}
+                wave={wave}
+                delayMs={150 + (i / (scene.visualMass ?? 1)) * 800}
               />
             )
           })}
@@ -77,22 +109,12 @@ export function RevertScene({
             <div className="mt-1 text-[11px] text-zinc-600">as if it never happened</div>
           </div>
         )}
-      </motion.div>
+      </ShakingLayer>
 
       {/* the stamp */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 2.4, rotate: -14 }}
-          animate={{ opacity: 1, scale: 1, rotate: -6 }}
-          transition={{ duration: 0.35, delay: 0.7, ease: [0.16, 1.2, 0.3, 1] }}
-          className="rounded-md border-4 border-red-500/80 px-5 py-2"
-          style={{ boxShadow: '0 0 48px 12px rgb(239 68 68 / 0.25)' }}
-        >
-          <span className="font-mono text-xl font-bold tracking-[0.2em] text-red-400 uppercase sm:text-2xl">
-            Execution reverted
-          </span>
-        </motion.div>
+        <RevertStamp />
       </div>
-    </motion.div>
+    </RevertFrame>
   )
 }

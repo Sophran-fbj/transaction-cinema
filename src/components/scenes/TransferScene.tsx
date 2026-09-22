@@ -1,12 +1,47 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useTransform } from 'framer-motion'
+import type { CSSProperties } from 'react'
 import { formatEther } from 'viem'
 import type { Actor, Scene } from '@/lib/story/types'
 import { ActorCard } from '@/components/actors/ActorCard'
 import { Identicon } from '@/components/actors/Identicon'
 import { particleStyle } from '@/components/actors/actorVisual'
 import { CountUp } from '@/components/primitives/CountUp'
+import { sampleKeyframes, useSceneProgress } from '@/lib/player/sceneTimeline'
+
+function TransferParticle({
+  interrupted,
+  wave,
+  delayMs,
+  style,
+}: {
+  interrupted: boolean
+  wave: number
+  delayMs: number
+  style: CSSProperties
+}) {
+  const progress = useSceneProgress({ delayMs, durationMs: 1800, easing: 'easeInOut' })
+  const up = wave - 16
+  const times = interrupted ? [0, 0.4, 0.7, 0.8, 0.9, 1] : [0, 0.35, 0.7, 1]
+  const leftValues = interrupted ? [16, 42, 54, 53, 55, 54] : [16, 45, 60, 84]
+  const topValues = interrupted
+    ? [wave, up, up, up + 1, up - 1, up]
+    : [wave, up, up, wave]
+  const opacityValues = interrupted ? [0, 1, 1, 1, 1, 1] : [0, 1, 1, 0]
+  const scaleValues = interrupted ? [0.6, 1, 1, 1, 1, 1] : [0.6, 1, 1, 0.9]
+  const left = useTransform(progress, (value) => `${sampleKeyframes(leftValues, value, times)}%`)
+  const top = useTransform(progress, (value) => `calc(50% + ${sampleKeyframes(topValues, value, times)}px)`)
+  const opacity = useTransform(progress, (value) => sampleKeyframes(opacityValues, value, times))
+  const scale = useTransform(progress, (value) => sampleKeyframes(scaleValues, value, times))
+
+  return (
+    <motion.div
+      className="absolute size-2.5 rounded-full"
+      style={{ ...style, left, top, opacity, scale }}
+    />
+  )
+}
 
 function TokenChip({ actor }: { actor: Actor }) {
   return (
@@ -56,46 +91,13 @@ export function TransferScene({
       <div className="pointer-events-none absolute inset-0">
         {particles.map((_, i) => {
           const wave = ((i % 5) - 2) * 14
-          const up = wave - 16
           return (
-            <motion.div
+            <TransferParticle
               key={i}
-              className="absolute size-2.5 rounded-full"
+              interrupted={Boolean(scene.interrupted)}
+              wave={wave}
+              delayMs={350 + (i / scene.visualMass) * 1100}
               style={glow}
-              initial={{ left: '16%', top: `calc(50% + ${wave}px)`, opacity: 0, scale: 0.6 }}
-              animate={
-                scene.interrupted
-                  ? {
-                      left: ['16%', '42%', '54%', '53%', '55%', '54%'],
-                      top: [
-                        `calc(50% + ${wave}px)`,
-                        `calc(50% + ${up}px)`,
-                        `calc(50% + ${up}px)`,
-                        `calc(50% + ${up + 1}px)`,
-                        `calc(50% + ${up - 1}px)`,
-                        `calc(50% + ${up}px)`,
-                      ],
-                      opacity: [0, 1, 1, 1, 1, 1],
-                      scale: [0.6, 1, 1, 1, 1, 1],
-                    }
-                  : {
-                      left: ['16%', '45%', '60%', '84%'],
-                      top: [
-                        `calc(50% + ${wave}px)`,
-                        `calc(50% + ${up}px)`,
-                        `calc(50% + ${up}px)`,
-                        `calc(50% + ${wave}px)`,
-                      ],
-                      opacity: [0, 1, 1, 0],
-                      scale: [0.6, 1, 1, 0.9],
-                    }
-              }
-              transition={{
-                duration: 1.8,
-                delay: 0.35 + (i / scene.visualMass) * 1.1,
-                ease: 'easeInOut',
-                times: scene.interrupted ? [0, 0.4, 0.7, 0.8, 0.9, 1] : [0, 0.35, 0.7, 1],
-              }}
             />
           )
         })}

@@ -1,10 +1,10 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { SceneRenderer } from '@/components/scenes/SceneRenderer'
-import { SceneAnimationBoundary } from '@/components/stage/SceneAnimationBoundary'
 import { ScenePlaybackProvider } from '@/lib/player/ScenePlaybackContext'
+import { useSceneProgress } from '@/lib/player/sceneTimeline'
 import { useScenePlayer } from '@/lib/player/useScenePlayer'
 import type { Story } from '@/lib/story/types'
 
@@ -17,6 +17,15 @@ const SCENE_LABELS: Record<Story['scenes'][number]['type'], string> = {
   revert: 'Revert',
   gas: 'Gas',
   outro: 'Receipt',
+}
+
+function SceneFrame({ children }: { children: ReactNode }) {
+  const opacity = useSceneProgress({ durationMs: 300, easing: 'easeOut' })
+  return (
+    <motion.div className="absolute inset-0" style={{ opacity }}>
+      {children}
+    </motion.div>
+  )
 }
 
 // The theater: letterbox stage, subtitles, chapter timeline, controls.
@@ -33,27 +42,16 @@ export function Stage({ story }: { story: Story }) {
     <div className="mx-auto w-full max-w-4xl">
       <div className="relative aspect-[4/3] min-h-[27rem] w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/60 sm:aspect-video lg:min-h-0">
         <ScenePlaybackProvider elapsed={player.elapsed}>
-          <SceneAnimationBoundary
-            elapsed={player.elapsed}
-            sceneRunId={player.sceneRunId}
-          >
-            <motion.div
-              key={`${player.index}:${player.sceneRunId}`}
-              className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <SceneRenderer
-                scene={scene}
-                cast={story.cast}
-                facts={story.facts}
-                status={story.status}
-                txHash={story.txHash}
-                onReplay={player.restart}
-              />
-            </motion.div>
-          </SceneAnimationBoundary>
+          <SceneFrame key={`${player.index}:${player.sceneRunId}`}>
+            <SceneRenderer
+              scene={scene}
+              cast={story.cast}
+              facts={story.facts}
+              status={story.status}
+              txHash={story.txHash}
+              onReplay={player.restart}
+            />
+          </SceneFrame>
         </ScenePlaybackProvider>
 
         {/* paused overlay — hidden when the film is over so the receipt stays clean */}

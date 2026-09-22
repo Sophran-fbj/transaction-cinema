@@ -1,10 +1,61 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useTransform } from 'framer-motion'
+import type { CSSProperties, ReactNode } from 'react'
 import type { Actor, Scene } from '@/lib/story/types'
 import { ActorCard } from '@/components/actors/ActorCard'
 import { actorHues, particleStyle } from '@/components/actors/actorVisual'
+import { sampleKeyframes, useSceneProgress } from '@/lib/player/sceneTimeline'
 import { usePrefersReducedMotion } from '@/lib/player/usePrefersReducedMotion'
+
+function PoolShell({ beat, children }: { beat: number; children: ReactNode }) {
+  const opacity = useSceneProgress({ durationMs: 500 * beat, easing: 'easeOut' })
+  const scale = useTransform(opacity, (value) => 0.9 + value * 0.1)
+  return (
+    <motion.div
+      style={{ opacity, scale }}
+      className="relative flex h-40 w-40 items-end justify-center gap-2 rounded-[2rem] border border-white/15 bg-white/[0.04] p-5 shadow-[0_0_50px_rgb(251_191_36/0.08)] sm:h-48 sm:w-52"
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function SwapParticle({
+  style,
+  start,
+  end,
+  top,
+  delayMs,
+  durationMs,
+}: {
+  style: CSSProperties
+  start: number
+  end: number
+  top: number
+  delayMs: number
+  durationMs: number
+}) {
+  const progress = useSceneProgress({ delayMs, durationMs, easing: 'easeInOut' })
+  const left = useTransform(progress, (value) => `${start + (end - start) * value}%`)
+  const opacity = useTransform(progress, (value) => sampleKeyframes([0, 1, 0], value))
+  return (
+    <motion.div
+      className="absolute size-2 rounded-full"
+      style={{ ...style, left, top: `${top}%`, opacity }}
+    />
+  )
+}
+
+function SwapReadout({ beat, children }: { beat: number; children: ReactNode }) {
+  const opacity = useSceneProgress({ delayMs: 2800 * beat, durationMs: 500 * beat, easing: 'easeOut' })
+  const y = useTransform(opacity, (value) => 8 * (1 - value))
+  return (
+    <motion.div style={{ opacity, y }} className="absolute inset-x-4 bottom-[7%] text-center">
+      {children}
+    </motion.div>
+  )
+}
 
 export function SwapV2Scene({
   scene,
@@ -33,12 +84,7 @@ export function SwapV2Scene({
       <ActorCard actor={tokenOut} role="Token out" />
 
       <div className="absolute inset-x-[28%] top-[15%] bottom-[25%] flex flex-col items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 * beat }}
-          className="relative flex h-40 w-40 items-end justify-center gap-2 rounded-[2rem] border border-white/15 bg-white/[0.04] p-5 shadow-[0_0_50px_rgb(251_191_36/0.08)] sm:h-48 sm:w-52"
-        >
+        <PoolShell beat={beat}>
           <ReserveTank
             label={tokenIn.label}
             display={scene.displayReserveIn}
@@ -58,38 +104,35 @@ export function SwapV2Scene({
             <div className="text-xs text-zinc-300">{scene.poolLabel}</div>
             {scene.feeLabel && <div className="text-[10px] text-zinc-500">{scene.feeLabel} fee</div>}
           </div>
-        </motion.div>
+        </PoolShell>
       </div>
 
       <div className="pointer-events-none absolute inset-0">
         {particlesIn.map((_, i) => (
-          <motion.div
+          <SwapParticle
             key={`in-${i}`}
-            className="absolute size-2 rounded-full"
             style={inStyle}
-            initial={{ left: '15%', top: `${42 + (i % 4) * 4}%`, opacity: 0 }}
-            animate={{ left: '43%', opacity: [0, 1, 0] }}
-            transition={{ duration: 1.6 * beat, delay: (0.2 + i * 0.06) * beat }}
+            start={15}
+            end={43}
+            top={42 + (i % 4) * 4}
+            durationMs={1600 * beat}
+            delayMs={(200 + i * 60) * beat}
           />
         ))}
         {particlesOut.map((_, i) => (
-          <motion.div
+          <SwapParticle
             key={`out-${i}`}
-            className="absolute size-2 rounded-full"
             style={outStyle}
-            initial={{ left: '57%', top: `${42 + (i % 4) * 4}%`, opacity: 0 }}
-            animate={{ left: '85%', opacity: [0, 1, 0] }}
-            transition={{ duration: 1.6 * beat, delay: (1.6 + i * 0.06) * beat }}
+            start={57}
+            end={85}
+            top={42 + (i % 4) * 4}
+            durationMs={1600 * beat}
+            delayMs={(1600 + i * 60) * beat}
           />
         ))}
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 2.8 * beat, duration: 0.5 * beat }}
-        className="absolute inset-x-4 bottom-[7%] text-center"
-      >
+      <SwapReadout beat={beat}>
         <div className="font-mono text-sm text-zinc-100 sm:text-base">
           {scene.displayIn} {tokenIn.label} → {scene.displayOut} {tokenOut.label}
         </div>
@@ -97,7 +140,7 @@ export function SwapV2Scene({
           {scene.priceLabel ?? 'Reserves rebalanced'}
           {scene.assumedDecimals ? ' · 18 decimals assumed' : ''}
         </div>
-      </motion.div>
+      </SwapReadout>
     </div>
   )
 }
@@ -115,14 +158,21 @@ function ReserveTank({
   hue: number
   beat: number
 }) {
+  const progress = useSceneProgress({
+    delayMs: 800 * beat,
+    durationMs: 1500 * beat,
+    easing: 'easeInOut',
+  })
+  const height = useTransform(progress, (value) => `${20 + (level * 100 - 20) * value}%`)
+
   return (
     <div className="relative h-28 w-10 overflow-hidden rounded-b-xl border border-white/10 bg-black/50 sm:h-32 sm:w-12">
       <motion.div
         className="absolute inset-x-0 bottom-0"
-        style={{ background: `linear-gradient(to top, hsl(${hue} 70% 38%), hsl(${hue} 75% 62%))` }}
-        initial={{ height: '20%' }}
-        animate={{ height: `${level * 100}%` }}
-        transition={{ delay: 0.8 * beat, duration: 1.5 * beat, ease: 'easeInOut' }}
+        style={{
+          height,
+          background: `linear-gradient(to top, hsl(${hue} 70% 38%), hsl(${hue} 75% 62%))`,
+        }}
       />
       <div className="absolute inset-x-0 bottom-1 truncate px-0.5 text-center font-mono text-[8px] text-white/80">
         {label}

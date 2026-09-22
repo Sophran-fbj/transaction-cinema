@@ -1,9 +1,10 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useTransform } from 'framer-motion'
 import { useState, type ReactNode } from 'react'
 import { formatEther, formatGwei } from 'viem'
 import type { StoryFacts } from '@/lib/story/types'
+import { useSceneProgress } from '@/lib/player/sceneTimeline'
 import { formatBlockTimestamp, shortenAddress } from '@/lib/utils/format'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -17,6 +18,16 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 const BUTTON =
   'rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-white/10'
+
+function TicketReveal({ children }: { children: ReactNode }) {
+  const opacity = useSceneProgress({ durationMs: 500, easing: 'easeOut' })
+  const y = useTransform(opacity, (value) => 12 * (1 - value))
+  return (
+    <motion.div style={{ opacity, y }} className="flex w-full max-w-md items-stretch">
+      {children}
+    </motion.div>
+  )
+}
 
 // The ending: the whole film prints itself into an admission ticket — a body
 // of receipt rows and a stub torn along the perforation. Every value on the
@@ -51,12 +62,7 @@ export function OutroScene({
     // hidden (the stub carries no unique data) and rows compress, so all
     // seven receipt rows fit the mobile stage instead of being clipped.
     <div className="flex h-full flex-col items-center justify-center px-4 py-4 sm:px-6 sm:py-5">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex w-full max-w-md items-stretch"
-      >
+      <TicketReveal>
         {/* ticket body */}
         <div className="flex-1 rounded-xl border border-white/10 bg-zinc-900/70 p-4 sm:rounded-l-xl sm:rounded-r-none sm:border-r-0 sm:p-6">
           <div className="mb-2 flex items-center justify-between sm:mb-3">
@@ -111,7 +117,7 @@ export function OutroScene({
             </span>
           </div>
         </div>
-      </motion.div>
+      </TicketReveal>
 
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:mt-5">
         <button type="button" onClick={onReplay} className={BUTTON}>

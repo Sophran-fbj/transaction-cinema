@@ -1,12 +1,13 @@
 'use client'
 
-import { motion, useMotionValueEvent } from 'framer-motion'
-import { useState } from 'react'
+import { motion, useMotionValueEvent, useTransform } from 'framer-motion'
+import { useState, type ReactNode } from 'react'
 import type { Actor, Scene } from '@/lib/story/types'
 import { ActorCard } from '@/components/actors/ActorCard'
 import { actorHues } from '@/components/actors/actorVisual'
 import { CountUp } from '@/components/primitives/CountUp'
 import { useSceneElapsed } from '@/lib/player/ScenePlaybackContext'
+import { sampleKeyframes, useSceneProgress } from '@/lib/player/sceneTimeline'
 
 // The approval scene: a permission badge — the "vault key" — flies from the
 // owner to the spender (or back, on revoke), and the spender's padlock opens
@@ -29,6 +30,42 @@ function LockIcon({ open }: { open: boolean }) {
       <rect x="4" y="11" width="16" height="10" rx="2" />
       {open ? <path d="M8 11V7a4 4 0 0 1 7.9-.9" /> : <path d="M8 11V7a4 4 0 0 1 8 0v4" />}
     </svg>
+  )
+}
+
+function PermissionBadge({
+  from,
+  to,
+  hue,
+  children,
+}: {
+  from: number
+  to: number
+  hue: number
+  children: ReactNode
+}) {
+  const progress = useSceneProgress({ delayMs: 400, durationMs: 2000, easing: 'easeInOut' })
+  const left = useTransform(progress, (value) => `${sampleKeyframes([from, 50, to], value)}%`)
+  const top = useTransform(progress, (value) => `${sampleKeyframes([50, 42, 50], value)}%`)
+  const opacity = useTransform(progress, (value) => sampleKeyframes([0, 1, 1], value))
+  const scale = useTransform(progress, (value) => sampleKeyframes([0.6, 1.1, 1], value))
+
+  return (
+    <motion.div
+      className="absolute flex size-16 -translate-y-1/2 items-center justify-center rounded-full border-2 font-mono text-lg"
+      style={{
+        left,
+        top,
+        opacity,
+        scale,
+        borderColor: `hsl(${hue} 70% 62%)`,
+        background: `hsl(${hue} 70% 62% / 0.12)`,
+        boxShadow: `0 0 32px 6px hsl(${hue} 70% 62% / 0.35)`,
+        color: `hsl(${hue} 80% 75%)`,
+      }}
+    >
+      {children}
+    </motion.div>
   )
 }
 
@@ -61,8 +98,8 @@ export function ApprovalScene({
   const { hue1 } = actorHues(token)
 
   // flight path direction: grant goes owner→spender, revoke flies back
-  const from = isRevoke ? '84%' : '16%'
-  const to = isRevoke ? '16%' : '84%'
+  const from = isRevoke ? 84 : 16
+  const to = isRevoke ? 16 : 84
 
   const decimals = scene.displayAmount?.split('.')[1]?.length ?? 0
 
@@ -90,25 +127,9 @@ export function ApprovalScene({
 
       {/* the flying permission badge */}
       <div className="pointer-events-none absolute inset-0">
-        <motion.div
-          className="absolute top-1/2 flex size-16 -translate-y-1/2 items-center justify-center rounded-full border-2 font-mono text-lg"
-          style={{
-            borderColor: `hsl(${hue1} 70% 62%)`,
-            background: `hsl(${hue1} 70% 62% / 0.12)`,
-            boxShadow: `0 0 32px 6px hsl(${hue1} 70% 62% / 0.35)`,
-            color: `hsl(${hue1} 80% 75%)`,
-          }}
-          initial={{ left: from, opacity: 0, scale: 0.6 }}
-          animate={{
-            left: [from, '50%', to],
-            top: ['50%', '42%', '50%'],
-            opacity: [0, 1, 1],
-            scale: [0.6, 1.1, 1],
-          }}
-          transition={{ duration: 2, ease: 'easeInOut', times: [0, 0.5, 1], delay: 0.4 }}
-        >
+        <PermissionBadge from={from} to={to} hue={hue1}>
           {isUnlimited ? '∞' : null}
-        </motion.div>
+        </PermissionBadge>
       </div>
 
       {/* amount readout under the flight path */}
