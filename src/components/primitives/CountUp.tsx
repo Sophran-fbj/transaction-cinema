@@ -1,15 +1,11 @@
 'use client'
 
-import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
-import { useEffect } from 'react'
+import { motion, useTransform } from 'framer-motion'
 import { usePrefersReducedMotion } from '@/lib/player/usePrefersReducedMotion'
+import { useSceneElapsed } from '@/lib/player/ScenePlaybackContext'
 
-// Single count-up primitive used by every scene: the odometer feel comes from
-// one implementation, so numbers across the film tick the same way. `from`
-// lets scenes count DOWN too — the revert rewind runs amounts back to zero.
-// Under prefers-reduced-motion the player compresses scenes to ~500ms, so the
-// count snaps straight to the final value — a 1.4–2.2s odometer would get cut
-// off before showing where it lands.
+// The number is a pure projection of the shared scene clock. No private
+// animation is started, so pause/replay cannot drift from the progress bar.
 export function CountUp({
   value,
   from = 0,
@@ -24,17 +20,13 @@ export function CountUp({
   className?: string
 }) {
   const prefersReducedMotion = usePrefersReducedMotion()
-  const mv = useMotionValue(from)
-  const text = useTransform(mv, (v) => format(v))
-
-  useEffect(() => {
-    mv.set(from)
-    const controls = animate(mv, value, {
-      duration: prefersReducedMotion ? 0 : durationMs / 1000,
-      ease: [0.16, 1, 0.3, 1],
-    })
-    return () => controls.stop()
-  }, [from, value, durationMs, prefersReducedMotion, mv])
+  const elapsed = useSceneElapsed()
+  const text = useTransform(elapsed, (elapsedMs) => {
+    if (prefersReducedMotion) return format(value)
+    const linear = Math.min(1, Math.max(0, elapsedMs / Math.max(1, durationMs)))
+    const eased = 1 - (1 - linear) ** 3
+    return format(from + (value - from) * eased)
+  })
 
   return <motion.span className={className}>{text}</motion.span>
 }

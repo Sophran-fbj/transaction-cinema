@@ -1,11 +1,12 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { motion, useMotionValueEvent } from 'framer-motion'
+import { useState } from 'react'
 import type { Actor, Scene } from '@/lib/story/types'
 import { ActorCard } from '@/components/actors/ActorCard'
 import { actorHues } from '@/components/actors/actorVisual'
 import { CountUp } from '@/components/primitives/CountUp'
+import { useSceneElapsed } from '@/lib/player/ScenePlaybackContext'
 
 // The approval scene: a permission badge — the "vault key" — flies from the
 // owner to the spender (or back, on revoke), and the spender's padlock opens
@@ -48,11 +49,12 @@ export function ApprovalScene({
   // lock flips shortly after the badge reaches its destination — unless the
   // approval was only ATTEMPTED (failed tx): then the vault stays locked
   const [lockOpen, setLockOpen] = useState(isRevoke && !scene.attempted ? true : false)
-  useEffect(() => {
+  const elapsed = useSceneElapsed()
+  useMotionValueEvent(elapsed, 'change', (elapsedMs) => {
     if (scene.attempted) return
-    const t = setTimeout(() => setLockOpen(!isRevoke), isRevoke ? 1600 : 2200)
-    return () => clearTimeout(t)
-  }, [isRevoke, scene.attempted])
+    const next = elapsedMs >= (isRevoke ? 1600 : 2200) ? !isRevoke : isRevoke
+    setLockOpen((current) => (current === next ? current : next))
+  })
 
   if (!owner || !spender || !token) return null
 
@@ -80,16 +82,10 @@ export function ApprovalScene({
 
       <div className="flex flex-col items-center gap-3">
         <ActorCard actor={spender} role="Spender" />
-        <motion.div
-          key={lockOpen ? 'open' : 'closed'}
-          initial={{ scale: 0.8, rotate: lockOpen ? -8 : 0 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
-        >
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
           <span className="text-[10px] tracking-[0.2em] text-zinc-500 uppercase">access</span>
           <LockIcon open={lockOpen} />
-        </motion.div>
+        </div>
       </div>
 
       {/* the flying permission badge */}

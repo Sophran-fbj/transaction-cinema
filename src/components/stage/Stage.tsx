@@ -1,8 +1,10 @@
 'use client'
 
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useMemo } from 'react'
 import { SceneRenderer } from '@/components/scenes/SceneRenderer'
+import { SceneAnimationBoundary } from '@/components/stage/SceneAnimationBoundary'
+import { ScenePlaybackProvider } from '@/lib/player/ScenePlaybackContext'
 import { useScenePlayer } from '@/lib/player/useScenePlayer'
 import type { Story } from '@/lib/story/types'
 
@@ -30,25 +32,29 @@ export function Stage({ story }: { story: Story }) {
   return (
     <div className="mx-auto w-full max-w-4xl">
       <div className="relative aspect-[4/3] min-h-[27rem] w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/60 sm:aspect-video lg:min-h-0">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={player.index}
-            className="absolute inset-0"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+        <ScenePlaybackProvider elapsed={player.elapsed}>
+          <SceneAnimationBoundary
+            elapsed={player.elapsed}
+            sceneRunId={player.sceneRunId}
           >
-            <SceneRenderer
-              scene={scene}
-              cast={story.cast}
-              facts={story.facts}
-              status={story.status}
-              txHash={story.txHash}
-              onReplay={player.restart}
-            />
-          </motion.div>
-        </AnimatePresence>
+            <motion.div
+              key={`${player.index}:${player.sceneRunId}`}
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SceneRenderer
+                scene={scene}
+                cast={story.cast}
+                facts={story.facts}
+                status={story.status}
+                txHash={story.txHash}
+                onReplay={player.restart}
+              />
+            </motion.div>
+          </SceneAnimationBoundary>
+        </ScenePlaybackProvider>
 
         {/* paused overlay — hidden when the film is over so the receipt stays clean */}
         {!player.playing && !player.finished && (
@@ -135,13 +141,27 @@ export function Stage({ story }: { story: Story }) {
         </button>
         <button
           type="button"
-          onClick={player.restart}
-          aria-label="Replay"
+          onClick={player.replayCurrent}
+          aria-label="Replay current scene"
+          title="Replay current scene"
           className="rounded-lg border border-white/10 bg-white/5 p-2 text-zinc-300 transition-colors hover:bg-white/10"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M1 4v6h6" />
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+            <path d="M20 4v7h-7" />
+            <path d="m10 8 6 4-6 4Z" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={player.restart}
+          aria-label="Replay film"
+          title="Replay film"
+          className="rounded-lg border border-white/10 bg-white/5 p-2 text-zinc-300 transition-colors hover:bg-white/10"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M5 5v14" />
+            <path d="m19 6-9 6 9 6Z" fill="currentColor" stroke="none" />
           </svg>
         </button>
       </div>
