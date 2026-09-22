@@ -144,10 +144,9 @@ export function Stage({ story }: { story: Story }) {
           title="Replay current scene"
           className="rounded-lg border border-white/10 bg-white/5 p-2 text-zinc-300 transition-colors hover:bg-white/10"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M20 11a8 8 0 1 0-2.34 5.66" />
-            <path d="M20 4v7h-7" />
-            <path d="m10 8 6 4-6 4Z" fill="currentColor" stroke="none" />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M1 4v6h6" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
           </svg>
         </button>
         <button
