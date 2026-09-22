@@ -1,11 +1,12 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { useMemo } from 'react'
+import { motion, useTransform } from 'framer-motion'
+import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import type { Actor, Scene } from '@/lib/story/types'
 import { ActorCard } from '@/components/actors/ActorCard'
 import { actorHues } from '@/components/actors/actorVisual'
 import { CountUp } from '@/components/primitives/CountUp'
+import { useSceneElapsed } from '@/lib/player/ScenePlaybackContext'
 import { usePrefersReducedMotion } from '@/lib/player/usePrefersReducedMotion'
 import { liquidityGlow } from '@/lib/story/semantics'
 
@@ -22,6 +23,102 @@ function particleGlow(actor: Actor | undefined) {
     background: isNative ? 'hsl(48 96% 68%)' : `hsl(${hue1} 70% 62%)`,
     boxShadow: `0 0 10px 2px ${isNative ? 'rgb(252 211 77 / 0.4)' : `hsl(${hue1} 70% 62% / 0.4)`}`,
   }
+}
+
+type TimelineEase = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'
+
+function ease(progress: number, easing: TimelineEase) {
+  if (easing === 'easeIn') return progress * progress
+  if (easing === 'easeOut') return 1 - (1 - progress) ** 2
+  if (easing === 'easeInOut') return progress * progress * (3 - 2 * progress)
+  return progress
+}
+
+function useTimelineProgress(delayMs: number, durationMs: number, easing: TimelineEase = 'linear') {
+  const elapsed = useSceneElapsed()
+  return useTransform(elapsed, (elapsedMs) => {
+    const linear = Math.min(1, Math.max(0, (elapsedMs - delayMs) / Math.max(1, durationMs)))
+    return ease(linear, easing)
+  })
+}
+
+function sample(values: number[], progress: number) {
+  if (values.length === 1) return values[0]
+  const scaled = progress * (values.length - 1)
+  const index = Math.min(values.length - 2, Math.floor(scaled))
+  const local = scaled - index
+  return values[index] + (values[index + 1] - values[index]) * local
+}
+
+function ClockedParticle({
+  style,
+  positions,
+  delayMs,
+  durationMs,
+  easing,
+}: {
+  style: CSSProperties
+  positions: [number, number, number]
+  delayMs: number
+  durationMs: number
+  easing: TimelineEase
+}) {
+  const progress = useTimelineProgress(delayMs, durationMs, easing)
+  const left = useTransform(progress, (value) => `${sample(positions, value)}%`)
+  const opacity = useTransform(progress, (value) => sample([0, 1, 0.9], value))
+
+  return (
+    <motion.div
+      className="absolute top-1/2 size-2 rounded-full"
+      style={{ ...style, left, opacity }}
+    />
+  )
+}
+
+function ClockedCorridor({ style, beat }: { style: CSSProperties; beat: number }) {
+  const progress = useTimelineProgress(300 * beat, 1200 * beat, 'easeInOut')
+  const scaleY = useTransform(progress, (value) => 0.6 + value * 0.4)
+
+  return (
+    <motion.div
+      className="absolute inset-x-0 top-[38%] h-[30%]"
+      style={{ ...style, opacity: progress, scaleY }}
+    />
+  )
+}
+
+function ClockedNeedle({
+  start,
+  destination,
+  beat,
+  children,
+}: {
+  start: number
+  destination: number
+  beat: number
+  children: ReactNode
+}) {
+  const progress = useTimelineProgress(1100 * beat, 2200 * beat, 'easeInOut')
+  const left = useTransform(progress, (value) => `${start + (destination - start) * value}%`)
+  const opacity = useTransform(progress, (value) => sample([0, 1, 1], value))
+
+  return (
+    <motion.div
+      className="absolute top-0 bottom-0 w-px bg-amber-300"
+      style={{ left, opacity, boxShadow: '0 0 12px 2px rgb(252 211 77 / 0.5)' }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function ClockedPrice({ beat, children }: { beat: number; children: ReactNode }) {
+  const opacity = useTimelineProgress(3400 * beat, 600 * beat, 'easeInOut')
+  return (
+    <motion.div style={{ opacity }} className="mt-1.5 text-xs text-amber-200/80">
+      {children}
+    </motion.div>
+  )
 }
 
 export function SwapV3Scene({
@@ -110,31 +207,24 @@ export function SwapV3Scene({
           </div>
 
           {/* liquidity corridor — glow intensity is real active liquidity */}
-          <motion.div
-            className="absolute inset-x-0 top-[38%] h-[30%]"
+          <ClockedCorridor
+            beat={beat}
             style={{
               background: `linear-gradient(90deg, hsl(${hueIn} 70% 62% / ${liquidity * 0.5}), hsl(${hueOut} 70% 62% / ${liquidity * 0.5}))`,
               filter: `blur(${14 - liquidity * 8}px)`,
             }}
-            initial={{ opacity: 0, scaleY: 0.6 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            transition={{ duration: 1.2 * beat, delay: 0.3 * beat }}
           />
 
           {/* in-particles streaming through the corridor */}
           <div className="absolute inset-0">
             {inParticles.map((_, i) => (
-              <motion.div
+              <ClockedParticle
                 key={i}
-                className="absolute top-1/2 size-2 rounded-full"
                 style={glowIn}
-                initial={{ left: '2%', opacity: 0 }}
-                animate={{ left: ['2%', '50%', '96%'], opacity: [0, 1, 0.9] }}
-                transition={{
-                  duration: 1.5 * beat,
-                  delay: (0.25 + (i / scene.visualMassIn) * 1.2) * beat,
-                  ease: 'easeIn',
-                }}
+                positions={[2, 50, 96]}
+                durationMs={1500 * beat}
+                delayMs={(250 + (i / scene.visualMassIn) * 1200) * beat}
+                easing="easeIn"
               />
             ))}
           </div>
@@ -143,13 +233,7 @@ export function SwapV3Scene({
               in the same inset-x-3 coordinate space as the ruler marks; the
               tick chip flips sides so it never clips at the right edge. */}
           <div className="absolute inset-x-3 top-0 bottom-0">
-            <motion.div
-              className="absolute top-0 bottom-0 w-px bg-amber-300"
-              initial={{ left: `${needleStart}%`, opacity: 0 }}
-              animate={{ left: `${NEEDLE_DEST}%`, opacity: [0, 1, 1] }}
-              transition={{ duration: 2.2 * beat, delay: 1.1 * beat, ease: [0.4, 0, 0.2, 1] }}
-              style={{ boxShadow: '0 0 12px 2px rgb(252 211 77 / 0.5)' }}
-            >
+            <ClockedNeedle start={needleStart} destination={NEEDLE_DEST} beat={beat}>
               <span
                 className={`absolute top-2 rounded bg-amber-300/15 px-1 font-mono text-[9px] whitespace-nowrap text-amber-200 ${
                   NEEDLE_DEST > 50 ? 'right-1.5' : 'left-1.5'
@@ -157,23 +241,19 @@ export function SwapV3Scene({
               >
                 tick {scene.endTick.toLocaleString('en-US')}
               </span>
-            </motion.div>
+            </ClockedNeedle>
           </div>
 
           {/* out-particles exiting */}
           <div className="absolute inset-0">
             {outParticles.map((_, i) => (
-              <motion.div
+              <ClockedParticle
                 key={i}
-                className="absolute top-1/2 size-2 rounded-full"
                 style={glowOut}
-                initial={{ left: '96%', opacity: 0 }}
-                animate={{ left: ['96%', '50%', '2%'], opacity: [0, 1, 0.9] }}
-                transition={{
-                  duration: 1.5 * beat,
-                  delay: (2.9 + (i / scene.visualMassOut) * 1.1) * beat,
-                  ease: 'easeOut',
-                }}
+                positions={[96, 50, 2]}
+                durationMs={1500 * beat}
+                delayMs={(2900 + (i / scene.visualMassOut) * 1100) * beat}
+                easing="easeOut"
               />
             ))}
           </div>
@@ -196,14 +276,9 @@ export function SwapV3Scene({
           />
         </div>
         {scene.priceLabel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 3.4 * beat, duration: 0.6 * beat }}
-            className="mt-1.5 text-xs text-amber-200/80"
-          >
+          <ClockedPrice beat={beat}>
             {scene.priceLabel} · tick {scene.endTick.toLocaleString('en-US')}
-          </motion.div>
+          </ClockedPrice>
         )}
       </div>
     </div>
