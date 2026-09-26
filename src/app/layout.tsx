@@ -4,8 +4,6 @@ import type { Metadata } from "next";
 // breaks offline/air-gapped builds.
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { MotionConfig } from "framer-motion";
-import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,9 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100">
-        <MotionConfig reducedMotion="user">
-          <Providers>{children}</Providers>
-        </MotionConfig>
+        {children}
       </body>
     </html>
   );

@@ -6,13 +6,13 @@ import type { ReactNode } from 'react'
 let browserQueryClient: QueryClient | undefined
 
 function getQueryClient() {
-  // A single browser client keeps film queries alive while the user moves
-  // between the lobby and a play route. Server renders stay isolated.
+  // A single browser client keeps film queries alive between play routes.
+  // Server renders stay isolated.
   if (typeof window === 'undefined') return new QueryClient()
   browserQueryClient ??= new QueryClient()
   return browserQueryClient
 }
 
-export function Providers({ children }: { children: ReactNode }) {
+export function PlayProviders({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>
 }

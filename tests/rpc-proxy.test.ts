@@ -80,11 +80,24 @@ describe('rpc proxy · caching', () => {
     expect(upstream).toHaveBeenCalledTimes(2)
   })
 
+  it('uses the current request id when serving a cached result', async () => {
+    const hash = txHash('c3')
+    upstream.mockImplementation(async () => upstreamResponse({ hash, blockNumber: '0x10d4e3' }))
+
+    const first = await post(rpcBody('eth_getTransactionByHash', [hash], 101))
+    const second = await post(rpcBody('eth_getTransactionByHash', [hash], 102))
+
+    expect((first.json as JsonRpcResponse).id).toBe(101)
+    expect((second.json as JsonRpcResponse).id).toBe(102)
+    expect(upstream).toHaveBeenCalledTimes(1)
+  })
+
   it('never caches eth_call (state-dependent) or non-historical blocks', async () => {
     upstream.mockImplementation(async () => upstreamResponse('0x1'))
 
-    await post(rpcBody('eth_call', [{ to: '0x1' }, 'latest']))
-    await post(rpcBody('eth_call', [{ to: '0x1' }, 'latest']))
+    const call = [{ to: `0x${'1'.repeat(40)}`, data: '0x12345678' }, 'latest']
+    await post(rpcBody('eth_call', call))
+    await post(rpcBody('eth_call', call))
     expect(upstream).toHaveBeenCalledTimes(2)
 
     await post(rpcBody('eth_getBlockByNumber', ['latest', false]))
@@ -94,6 +107,31 @@ describe('rpc proxy · caching', () => {
 })
 
 describe('rpc proxy · guardrails', () => {
+  it('rejects malformed requests and expensive parameter shapes before forwarding', async () => {
+    for (const body of [
+      null,
+      [],
+      rpcBody('eth_getTransactionByHash', ['0x1234']),
+      rpcBody('eth_getBlockByNumber', ['latest', true]),
+      rpcBody('eth_call', [{ to: '0x1234', data: '0x' }, 'latest']),
+    ]) {
+      const { status, json } = await post(body)
+      expect(status).toBe(400)
+      expect((json as JsonRpcResponse).error?.code).toBe(-32600)
+    }
+    expect(upstream).not.toHaveBeenCalled()
+  })
+
+  it('rejects an oversized body without reading or forwarding it', async () => {
+    const response = await POST(new Request(PROXY_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: ' '.repeat(64 * 1024 + 1),
+    }))
+    expect(response.status).toBe(413)
+    expect(upstream).not.toHaveBeenCalled()
+  })
+
   it('rejects non-read methods before touching the upstream', async () => {
     const { json } = await post(rpcBody('eth_sendRawTransaction', ['0xdeadbeef']))
     const body = json as JsonRpcResponse
@@ -142,5 +180,35 @@ describe('rpc proxy · guardrails', () => {
     const responses = json as JsonRpcResponse[]
     expect(responses.map((r) => r.id)).toEqual([7, 8])
     expect(responses.every((r) => r.result === '0x1')).toBe(true)
+  })
+
+  it('limits aggregate RPC operations before consuming more upstream quota', async () => {
+    upstream.mockImplementation(async () => upstreamResponse('0x1'))
+    const batch = Array.from({ length: 20 }, (_, i) => rpcBody('eth_chainId', [], i + 1))
+    let limited = false
+    for (let i = 0; i < 13; i += 1) {
+      const before = upstream.mock.calls.length
+      const response = await post(batch)
+      if (response.status === 429) {
+        expect(response.json).toMatchObject({ error: { code: -32005 } })
+        expect(upstream).toHaveBeenCalledTimes(before)
+        limited = true
+        break
+      }
+    }
+    expect(limited).toBe(true)
+  })
+
+  it('counts malformed requests toward the per-process request budget', async () => {
+    let limited = false
+    for (let i = 0; i <= 120; i += 1) {
+      const response = await post(null)
+      if (response.status === 429) {
+        expect(response.json).toMatchObject({ error: { code: -32005 } })
+        limited = true
+        break
+      }
+    }
+    expect(limited).toBe(true)
   })
 })

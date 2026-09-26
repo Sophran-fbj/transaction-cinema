@@ -84,7 +84,7 @@ test('a fixture-backed transaction plays and its controls remain interactive', a
 
   await page.getByRole('button', { name: 'Pause' }).click()
   await expect(page.getByRole('button', { name: 'Play', exact: true }).last()).toBeVisible()
-  await page.getByRole('button', { name: 'Replay', exact: true }).click()
+  await page.getByRole('button', { name: 'Replay film', exact: true }).click()
   await expect(page.getByText('Scene 1/4 · Opening')).toBeVisible()
 })
 

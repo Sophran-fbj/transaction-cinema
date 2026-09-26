@@ -158,6 +158,11 @@ public endpoints. Two optional knobs (see `.env.example`):
   txs, receipts, historical blocks) in a small LRU. This is the recommended
   setup for anything key-bearing.
 
+The proxy rejects oversized or malformed requests and applies a per-process
+request/concurrency budget. On serverless or multi-instance deployments these
+budgets are **not shared**: also enable host/edge rate limiting to protect a
+paid `RPC_URL` across all instances.
+
 ## Scripts
 
 ```
